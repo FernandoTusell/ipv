@@ -1,0 +1,371 @@
+---
+title: "Ejemplos de uso de las funciones en el paquete 'ipv'"
+author: "F. Tusell"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(cache=TRUE, fig.width=7, fig.height=5.5)
+options(width=120)
+```
+
+
+En el proceso de examinar la viabilidad de un índice de precio de la vivienda para 
+la CAPV basado en información procedente del portal `idealista.com`, se ha hecho preciso escribir cierto número de funciones. Estas funciones se presentan recolectadas en el paquete `ipv`. 
+
+Se trata de funciones perfectamente utilizables, pero que han sido escritas al albur del momento, para responder a necesidades momentáneas, y por tanto carecen del pulimento y del grado de comprobación que uno espera en un paquete precedido de
+análisis y estructurado desde el comienzo.
+
+
+## Datos
+
+Los datos iniciales recibidos se han condensado en sendos ficheros (en formato
+`.rda`) de nombres `venta.dep.rda` y `alquiler.dep.rda`, en que el sufijo `dep`
+hace referencia a la depuración de valores anómalos, reincorporaciones de registros, 
+etc. Son ficheros muy voluminosos que residen en el directorio `data` del paquete,
+y pueden cargarse mediante:
+
+```{r}
+library(ipv)
+data("venta.dep")
+data("alquiler.dep")
+```
+
+
+Además del paquete `ipv` necesitaremos los que siguen. Son todos paquetes públicamente disponibles en CRAN.
+
+```{r}
+library(mgcv)
+library(tidyverse, verbose=FALSE)
+library(sp)
+library(rgdal)
+library(rgeos)
+library(spgwr)
+library(zoo)
+```
+
+## Estimación de modelos
+
+
+El paquete posibilita estimar índices a partir de dos tipos de modelos: 
+
+1. Modelos globales: son modelos en que los parámetros toman el mismo valor en el ajuste de todas las observaciones del ámbito. Como los valores son muy dependientes 
+de la localización, se emplea como proxy de la misma alguna variable como `AF` (área funcional), `SUBREGION`, etc. 
+2. Modelos geogràficamente ponderados (GWR): son modelos en que los parámetros varían en el espacio. El efecto, e.g., de poseer un garaje una vivienda no es
+identico para todas las viviendas en un ámbito, como en el caso de los modelos globales, sino que varía con las coordenadas de la vivienda. Ello permitiría, con muestra suficiente, valoraciones incluso variando con cada portal.
+
+En ambos casos se añade una tendencia no paramétrica, a partir de la cual se 
+calculan los índices.
+
+Preparamos los datos así:
+
+```{r PrepDatos}
+datos <- venta.dep %>% 
+  mutate( logpm2 = log(IMP_CREACION / NUM_SUPERF),
+          x = as.integer(FEC_CREACION - min(FEC_CREACION)) ) %>%
+  filter( !is.na(DX_ETRS89) & !is.na(DY_ETRS89)) %>%
+  as.data.frame()
+```
+
+ La variable `x` no es más que el número de días transcurrido desde la primera fecha disponible en la muestra. Se eliminan las observaciones que no están geolocalizadas, pues aunque las coordenadas
+no hacen falta en un modelo global, sí son necesarias en un modelo geográficamente ponderado (GWR).
+
+
+### Modelos globales
+
+
+
+Los modelos se estiman mediante la función `gam`. Por ejemplo,
+
+
+```{r ModeloGlobal}
+mod1 <- gam( logpm2 ~   SUBREGION + ROOMNUMBER + HASLIFT + 
+                HASGARDEN + HASSWMMINGPOOL + HASTERRACE + 
+                IND_GARAJE  + s(x,bs="cr", k=16), 
+              data=datos)
+```
+
+Es decisión del analista cuántas y cuáles variables incluir; deseamos, evidentemente, un modelo tan descriptivo como sea posible y que incorpore 
+el máximo de variables capaces de describir la calidad de cada inmueble. No obstante, la presencia de valores perdidos hace que un modelo muy ambicioso
+haya de prescindir de gran parte de la muestra (porque hay variables muy poco observadas). El parámetro `k` es el número de grados de libertad equivalentes:
+`s(x, bs="cr", k=16)` es un **spline** cúbico con esos grados de libertad. Uno o dos grados de libertad por año es por lo general suficiente y proporciona más que suficiente flexibilidad en el ajuste.
+
+Podemos inspeccionar el resultado mediante
+
+```{r, ResultadosModeloGlobal}
+summary(mod1)
+anova(mod1)
+```
+
+
+#### ConsInd
+
+El objeto devuelto por `gam` es cuanto necesitamos para calcular el índice,
+haciendo uso de la función `ConsInd`:
+
+```{r, ZonasViaSUBREGION}
+ind <- ConsInd(modelo=mod1, base="2007-12-31", 
+        tit="Índice precio vivienda CAPV.\nEf. espacial: SUBREGION",
+        fechas=as.Date(datos$FEC_CREACION),
+        plot=TRUE)
+```
+
+Obsérvese que aunque el resultado deseado en general es la gráfica, `ConsInd` retorna también de modo invisible el índice, en forma de serie temporal fechada
+diariamente:
+
+```{r}
+class(ind)
+head(ind)
+```
+
+#### IndZonas
+
+Podemos desear ajustar índices a diferentes ámbitos. La función `IndZonas`
+simplifica el trabajo: en lugar de una invocación a `ConsInd` para cada
+ámbito ---por ejemplo, para cada Territorio Histórico--- podemos hacer una 
+sóla invocación a `IndZonas` dando una variable `zonas` cuyos niveles 
+especificaran cada uno de los ámbitos para los que se calcula un índice.
+
+Así por ejemplo, si queremos un índice para cada provincia,
+
+```{r}
+ind.prov <- IndZonas(datos, zonas="PROVINCIA", frm=formula(mod1))
+```
+
+No es preciso que proporcionemos toda la información obtenida al estimar 
+el modelo `mod1`: basta con la fórmula, que podemos extraer de `mod1` o 
+directamente teclear. Una invocación equivalente a la anterior, sería:
+
+```{r}
+ind.prov <- IndZonas(datos, zonas="PROVINCIA", 
+                     frm=formula( logpm2 ~ SUBREGION + ROOMNUMBER + 
+                                    HASLIFT + HASGARDEN + HASSWMMINGPOOL +
+                                    HASTERRACE +  IND_GARAJE  + 
+                                    s(x,bs="cr", k=16) ))
+```
+
+El resultado en `ind.prov` es *una lista* de índices que podemos representar en sendos paneles con los nombres que deseemos. 
+
+#### mggplot
+
+A continuación se toman esos nombres
+de los que tienen los elementos de `ind.prov` y se invoca la función `mggplot`
+para hacer todas las gráficas de una vez:
+
+
+```{r}
+prov <- names(ind.prov)
+prov
+mggplot(ind.prov, columnas=prov)   
+```
+
+Podemos optar por representar todas las gráficas superpuestas en un único
+panel:
+
+```{r}
+mggplot(ind.prov, columnas=prov, tipo="multiple")   
+```
+
+
+### Modelos geográficamente ponderados
+
+
+
+Las coordenadas que ha añadido EUSTAT (`DX_ETRS89`, `DY_ETRS89` y
+correspondientes `DX_ED50` y `DY_ED50`) parecen ya proyectadas en
+metros. Podemos emplearlas fijando un *bandwidth* directamente o
+obtenerlo mediante validación cruzada (muy costoso);
+fijaremos un bandwidth de 5000m. Se trata del radio de las regiones en que se llevan a cabo los ajustes locales.
+
+Hemos de crear una dataframe espacial con las variables que nos interesan:
+
+```{r, CreacionSpatialDataFrame}
+spdatos <- datos[,c("logpm2","SUBREGION","ROOMNUMBER","HASLIFT",
+                    "HASGARDEN","HASSWMMINGPOOL","HASTERRACE",
+                    "IND_GARAJE","DX_ETRS89","DY_ETRS89")]
+spdatos <- spdatos[complete.cases(spdatos),]
+coordinates(spdatos) <- ~ DX_ETRS89 + DY_ETRS89
+```
+
+
+El algoritmo de *backfitting*  alterna los ajustes espacial y no paramétrico hasta convergencia. **A efectos puramente ilustativos, y dado que el cálculo completo es
+tan costoso de efectuar, se selecciona aquí una submuestra para que el tiempo
+de computación no sea excesivo.** El índice con la muestra completa varia apreciablemente.
+
+```{r, BackFitting-Global}
+frm         <- formula(mod1)
+frm.param   <- update(frm, ~ . - s(x,bs="cr",k=16))
+smooth.term <- 's(x,bs="cr",k=16)'
+
+sel <- ((1:nrow(datos)) %% 5) == 0                        # Una observación de cada 5
+sel <- sel & datos$FEC_CREACION > as.Date("2006-12-31")   # Sólo donde hay datos suficientes
+
+indice <- BackFitting(frm.param=frm.param,
+            smooth.term=smooth.term,
+            var.loc="SUBREGION",
+            coords=c("DX_ETRS89","DY_ETRS89"),
+            datos=datos[sel,],
+            var.fecha='FEC_CREACION',
+            baseday='2008-01-01')
+```
+
+El resultado es,
+
+```{r}
+plot(indice)
+```
+
+El resultado anterior corresponde a un modelo en que la parte paramétrica presenta 
+variación espacial (gracias al empleo de GWR), mientras que la parte no paramétrica (que da lugar al índice) es común al ámbito completo. La función `BackFittingLocal` permite 
+la estimación de índices para ubicaciones concretas, cuyas coordenadas se pasan en el argumento `cal.pts`. Hay que señalar un segundo *bandwitdh*, `bws`, que puede o no coincidir con el `bw` empleado en la GWR.
+
+Seleccionaremos como puntos de cálculo de índices locales los centroides de barrios que parecen haber registrado una evolución diferente:
+
+```{r, CreacionPuntosIndLocal}
+# barrios <- c("Indautxu", "Abando - Albia", "Deusto")
+# cal.pts <- matrix(0,length(barrios),2)
+# b    <- venta.dep[venta.dep$BARRIO %in% barrios, ]
+# dimnames(cal.pts) <- list(barrios, NULL)
+# for (i in barrios) {
+#   cal.pts[i,] <- apply(b[b$BARRIO==i, c("DX_ETRS89","DY_ETRS89")], 2, FUN="median", na.rm=TRUE)
+# }
+# cal.pts
+
+xy <- data.frame(ID=c("PlazaEnsanche","GeneralEguia"),
+                 X=c(-2.931413,-2.946283),
+                 Y=c(43.263538,43.259257))
+coordinates(xy) <- c("X","Y")
+proj4string(xy) <- CRS("+proj=longlat +datum=WGS84") 
+res <- spTransform(xy, CRS("+proj=utm +zone=30 ellps=WGS84"))
+res <- as.data.frame(res)
+cal.pts <- as.matrix(res[,c("X","Y")])
+rownames(cal.pts) <- res[,"ID"]
+```
+
+Podemos ahora calcular varios índices locales así:
+
+```{r, BackFittingLocal}
+# 
+#  Eliminación de observaciones muy lejos de Bilbao
+#
+sel <- (datos$DX_ETRS89 > 504000) & (datos$DX_ETRS89 < 506000)
+sel <- sel & (datos$DY_ETRS89 > 4788000) & (datos$DX_ETRS89 < 4791000)
+sel <- sel & datos$FEC_CREACION > as.Date("2010-12-31")   # Sólo donde hay datos suficientes
+
+lista.ind <- BackFittingLocal(frm.param=frm.param,
+                        smooth.term='s(x,bs="cr",k=9)',
+                        cal.pts=cal.pts,
+                        datos=datos[sel,],
+                        coords=c("DX_ETRS89","DY_ETRS89"),
+                        var.fecha='FEC_CREACION',
+                        var.loc='SUBREGION',
+                        baseday="2010-12-31",
+                        bw=500,
+                        bws=200,
+                        tol=0.005,
+                        plotind=FALSE)
+```
+
+```{r}
+mggplot <- function(x, columnas=names(x),
+                    tipo=c("panel","multiple"),
+                    leyenda=c("bottom","right")) {
+  if ( is.list(x))
+    x <- do.call("merge", x[columnas])
+  fecha <- index(x)
+  tmp   <- cbind(fecha, as.data.frame(x))
+  tmp   <- tmp %>% gather(Location,indice,-fecha)
+  if (tipo[1]=="panel")
+    p <- ggplot(tmp) +
+    geom_line(aes(x=fecha, y=indice, colour=Location)) +
+    xlab("Date") + ylab("Index") +
+    facet_wrap(~ Location) +
+    theme(legend.position=leyenda[1])
+  else if (tipo[1]=="multiple")
+    p <- ggplot(tmp) +
+    geom_line(aes(x=fecha, y=indice, colour=Location)) +
+    xlab("Date") + ylab("Index") +
+    theme(legend.position=leyenda[1])
+  return(p)
+}
+
+names(lista.ind[[2]]) <- rownames(lista.ind[[1]])
+p <-mggplot(lista.ind[[2]], columnas=rownames(lista.ind[[1]]), tipo="multiple")
+p <- p + ggtitle("Local indices",
+              sub=paste("Base: ","31-12-2010"," = 100"))
+pdf(file="localindices.pdf")
+print(p)
+scratch <- dev.off()
+```
+
+
+
+
+## Funciones auxiliares
+
+El paquete contiene algunas funciones auxiliares que no se prevee sean invocadas directamente por el usuario (`pols` y `CompFechas`) y una función (`cloromap`) que permite representar una variable sobre el mapa
+de la CAPV o partes de él.
+
+#### cloromap
+
+Tomemos las observaciones de inmuebles a la venta y contabilicemos el número de 
+ellas que existen por cada área funcional (codificada en la variable `AF`):
+Para
+
+```{r}
+Obs <- venta.dep %>%
+  group_by(AF) %>%  
+  summarise( Obs= n() ) %>%
+  as.data.frame()
+```
+
+La dataframe `Obs` tiene esta estructura:
+
+```{r}
+head(Obs)
+```
+
+Para cartografiarla, necesitamos una dataframe espacial  (spframe) con polígonos
+para las entidades espaciales sobre las que se agrega (aquí, áreas funcionales).
+Podemos obtener dichos contornos así:
+
+```{r}
+dsn <- system.file("extdata/CB_AREAS_FUNCIONALES_5000_ETRS89.shp", 
+                   package = "ipv")[1]
+af  <- readOGR(dsn)
+```
+
+Comprobamos la correspondencia de las areas funcionales de la cartografía y las del fichero de idealista completado:
+
+
+```{r}
+af@data
+unique(Obs$AF)
+cbind(levels(af@data$A_FUNC_CAS), 
+      levels(sort(unique(Obs$AF))))
+```
+
+
+La correspondencia es total: renombramos los niveles de `venta.dep`
+con los nombres en `af`.
+
+```{r}
+levels(Obs$AF) <- levels(af@data$A_FUNC_CAS)
+```
+
+
+```{r}
+cloromap(sp=af, var.sp="A_FUNC_CAS", df=Obs, var.df="AF",
+         var="Obs", legend.title="Obs.\ndisponibles",
+         graf.title="Obs. por área funcional",
+         midpoint=36000)
+```
+
+Lo que es crucial para que lo anterior funcione es la correspondencia 1-1 entre
+los niveles de la variable `var.sp` de la dataframe espacial `sp`  y la variable
+`var.df` de la dataframe ordinaria `df`. El argumento `midpoint` da el valor "neutro" (codificado con blanco en la escala cromática divergente empleada), que habitualmente querremos hacer coincidir con la mediana de los valores, pero podemos fijar a nuestro antojo. 
