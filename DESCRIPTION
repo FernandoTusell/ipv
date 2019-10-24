@@ -1,16 +1,16 @@
 Package: ipv
 Type: Package
-Title: Indices de precios de vivienda en la CAPV
+Title: Computation of housing price indices
 Version: 0.1.2
 Author: F. Tusell
 Maintainer: F. Tusell <fernando.tusell@ehu.es>
-Description: Generación de índices de precios ofertados de vivienda a partir de información suministrada por idealista.com
-    Aunque la implementación está ligada a esta fuente de información se ha procurado escribir las funciones del modo más general posible, de forma que puedan eventualmente adaptarse a otros usos o fuentes.
-License: Desarrollado bajo contrato con el GV/EJ que ostenta la propiedad exclusiva.
+Description: Computation of price indices from information in the web portal idealista.com.
+    The implementation is geared to a particular application and source of information, but we have attempted to write functions in a way that make their adaptation to other settings feasible.
+License: GPL-3
 Encoding: UTF-8
 LazyData: true
 RoxygenNote: 6.1.1
-Suggests: 
+Suggests:
     knitr,
     rmarkdown
 VignetteBuilder: knitr
