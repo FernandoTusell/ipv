@@ -1,12 +1,11 @@
-#' Estimación semiparamétrica mediante 'backfitting'.
+#' Semi-parametric estimation usign backfiffing.
 #'
-#' Realiza la estimación de un modelo semi-paramétrico, cuya parte
-#' paramétrica esta formada por una regresión espacialmente ponderada y
-#' cuya parte no paramétrica está formada por un spline cúbico global
-#' (único para todas las observaciones)
+#' This function fits a parametric model whose parametric part is
+#' a geographically weigthed regression (GWR) while the non-parametric
+#' is a cubic spline global, to all observations
 #'
-#' @param frm.param Fórmula de la parte paramétrica (GWR) del modelo.
-#' @param smooth.term Término no paramétrico del modelo.
+#' @param frm.param Formula for the parametric part  (GWR) of the model
+#' @param smooth.term Non-parametric part of the model
 #' @param var.loc Variable que en el modelo base se emplea como proxy de la ubicación. Se elimina en el modelo que realiza GWR
 #' @param datos Dataframe espacial conteniendo los datos.
 #' @param indice0 Valores iniciales del índice. Optativo: si está ausente, se calcula.
@@ -47,7 +46,7 @@ BackFitting <- function(frm.param,
   datos <- cbind(datos,y.orig=datos[,resp])
   #
   #  Modificadores de la fórmula y fragmentos: añadimos a
-  #  la parte paramétrica el(los) termino(s) suave(s) para
+  #  la parte paramétrica el(los  ) termino(s) suave(s) para
   #  estimar el GAM inicial. Eliminamos las variables de
   #  significado espacial de la fórmula a emplear en la
   #  estimación GWR.
@@ -413,7 +412,7 @@ CompFechas <- function(indice,fechas) {
 #' extrae dicho término, lo completa para los días en que no haya observación, y lo devuelve como una serie temporal, representándolo gráficamente
 #' si se desea. Se supone que la variable respuesta el log(Precio) o log(Precio/m2); el índice devuelto lo es para la variable Precio o Precio/m2, respectivamente, y datos fechados diariamente.
 #'
-#' @param modelo Modelo semiparamétrico estimado por \code{gam.}
+#' @param modelo Modelo semiparamétrico estimado por \code{g am.}
 #' @param base Fecha (día) tomada como base 100 del índice.
 #' @param conf Confianza del intervalo; si no se especifica, 95\%.
 #' @param fechas Vector de fechas de las observaciones; habitualmente se toma de una columna de la dataframe empleada por \code{gams} para estimar \code{modelo}
@@ -474,9 +473,97 @@ ConsInd <- function(modelo=NULL,base="2008-02-01",
 }
 
 
+#' Fusion
+#'
+#' Merge two dataframes using  \code{varX} and \code{varY} as keys. Since they may not be exactly alike,
+#' \code{canon} contains a dataframe which enables translation of either key
+#' to a canonical form after (optionally) transliterating to a common character encoding.
+#'
+#' @param X  First dataframe to merge
+#' @param Y  Second dataframe to merge
+#' @param varX  Variable acting as key in X
+#' @param varY  Variable acting as key in Y
+#' @param canon Correspondence between varX, varY and canonical value of the key
+#' @param transX Transformation to be applied to varX (if any)
+#' @param transY Transformation to be applied to varY (if any)
+#'
+#' @return Merged data frame (or lines in X, y or both that cannot be matched)
+#' @export
+#'
+#' @examples
+#' X     <- data.frame(a=c("Bilbao","San Sebastian","Vitoria","Terue"),
+#'                     b=c("A","B","B","D"), d=c(TRUE,TRUE,FALSE,TRUE))
+#' Y     <- data.frame(e=c("Bilbao","Donostia","Vitoria/Gazteiz","Sorias"),
+#'                     g=c("F","G","H","J"), h=c(TRUE,FALSE,TRUE,TRUE))
+#' canon <- data.frame(X=c("Bilbao","San Sebastian","Vitoria"),
+#'                     Y=c("Bilbao","Donostia","Vitoria/Gazteiz"),
+#'                     Canon=c("Bilbao","Donostia","Vitoria"))
+#' XY <- Fusion(X,Y,varX="a",varY="e",canon=canon)
+#'
+#' canon <- data.frame(X=c("Bilbao","San Sebastian","Vitoria","Teruel"),
+#'                     Y=c("Bilbao","Donostia","Vitoria/Gazteiz", "Teruel"),
+#'                     Canon=c("Bilbao","Donostia","Vitoria","Teruel"))
+#' XY <- Fusion(X,Y,varX="a",varY="e",canon=canon)
+#'
+#' canon <- data.frame(X=c("Bilbao","San Sebastian","Vitoria","Teruel","Soria"),
+#'                     Y=c("Bilbao","Donostia","Vitoria/Gazteiz", "Teruel","Soria"),
+#'                     Canon=c("Bilbao","Donostia","Vitoria","Teruel","Soria"))
+#' XY <- Fusion(X,Y,varX="a",varY="e",canon=canon)
+#'
+Fusion <- function(X,
+                   Y,
+                   varX,
+                   varY,
+                   canon,
+                   transX = NULL,
+                   transY = NULL)
+{
+  #
+  # Make local copies
+  #
+  tmp.varX <- X
+  tmp.varY <- Y
+  #
+  #  Transliterate as needed
+  #
+  if (!is.null(transX))
+    tmp.varX[, varX] <-
+    iconv(x = tmp.varX[, varX], from = transX, to = "utf8")
+  if (!is.null(transY))
+    tmp.varY[, varY] <-
+    iconv(x = tmp.varY[, varY], from = transY, to = "utf8")
+  #
+  #  Match key varX and replace by canonical values
+  #
+  tmp <- match(tmp.varX[, varX], canon[, "X"])
+  if (any(is.na(tmp))) {
+    cat("\nThe following values of varX could not be matched:\n")
+    cat(as.character(tmp.varX[is.na(tmp),varX]),"\n")
+  }
+  tX <- ifelse(!is.na(tmp), canon[tmp, "Canon"], NA)
+  if (is.factor(canon[tmp, "Canon"]))
+    tmp.varX[, varX] <- factor(levels(canon[tmp, "Canon"])[tX])
+
+  #
+  #  Do likewise for key varY
+  #
+  tmp <- match(tmp.varY[, varY], canon[, "Y"])
+  if (any(is.na(tmp))) {
+    cat("\nThe following values of varY could not be matched:\n")
+    cat(as.character(tmp.varY[is.na(tmp),varY],"\n"))
+  }
+  tY <- ifelse(!is.na(tmp), canon[tmp, "Canon"], NA)
+  if (is.factor(canon[tmp, "Canon"]))
+    tmp.varY[, varY] <- factor(levels(canon[tmp, "Canon"])[tY])
+
+  tmp <- merge(x=tmp.varX, y=tmp.varY, by.x=varX, by.y=varY, all=TRUE)
+  return(tmp[!is.na(tmp[,varX]),])
+}
+
+
 #' IndZonas
 #'
-#' Estimación de índices globales por zonas; es unam mera función de utilidad que invoca reiteradamente  \code{ConsInd}.
+#' Estimación de índices globales por zonas; es una mera función de utilidad que invoca reiteradamente  \code{ConsInd}.
 #' @param datos Dataframe de datos
 #' @param zonas Nombre de una columna de \code{datos} que define las zonas para las que se desea calcular los índices.
 #' @param frm Fórmula especificando el modelo base que quiere emplearse, en la forma esperada por \code{gam.} La fórmula es común a todos los índices computados por la función.
