@@ -21,7 +21,7 @@ IndZonas(datos, zonas, frm = NULL, base = "2008-01-01", plot = FALSE)
 Una lista con los índices calculados, en el formato en que los devuelve \code{ConsInd}.
 }
 \description{
-Estimación de índices globales por zonas; es unam mera función de utilidad que invoca reiteradamente  \code{ConsInd}.
+Estimación de índices globales por zonas; es una mera función de utilidad que invoca reiteradamente  \code{ConsInd}.
 }
 \examples{
 Ver viñeta

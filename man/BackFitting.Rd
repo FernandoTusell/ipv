@@ -2,19 +2,29 @@
 % Please edit documentation in R/ipv.R
 \name{BackFitting}
 \alias{BackFitting}
-\title{Estimación semiparamétrica mediante 'backfitting'.}
+\title{Semi-parametric estimation usign backfiffing.}
 \usage{
-BackFitting(frm.param, smooth.term = "s(x,bs=\\"cr\\",k=24)",
-  var.loc = NULL, datos, indice0, coords, var.fecha,
-  baseday = "2012-12-31", bw = 5000, cores, tol = 0.001,
-  plotind = FALSE)
+BackFitting(
+  frm.param,
+  smooth.term = "s(x,bs=\\"cr\\",k=24)",
+  var.loc = NULL,
+  datos,
+  indice0,
+  coords,
+  var.fecha,
+  baseday = "2012-12-31",
+  bw = 5000,
+  cores,
+  tol = 0.001,
+  plotind = FALSE
+)
 }
 \arguments{
-\item{frm.param}{Fórmula de la parte paramétrica (GWR) del modelo.}
+\item{frm.param}{Formula for the parametric part  (GWR) of the model}
 
-\item{smooth.term}{Término no paramétrico del modelo.}
+\item{smooth.term}{Non-parametric part of the model}
 
-\item{var.loc}{Variable que en el modelo base se emplea como proxy de la ubicación.}
+\item{var.loc}{Variable que en el modelo base se emplea como proxy de la ubicación. Se elimina en el modelo que realiza GWR}
 
 \item{datos}{Dataframe espacial conteniendo los datos.}
 
@@ -38,10 +48,9 @@ BackFitting(frm.param, smooth.term = "s(x,bs=\\"cr\\",k=24)",
 Un índice de precios, con base en el día especificado, en formato de serie temporal \code{zoo.}
 }
 \description{
-Realiza la estimación de un modelo semi-paramétrico, cuya parte
-paramétrica esta formada por una regresión espacialmente ponderada y
-cuya parte no paramétrica está formada por un spline cúbico global
-(único para todas las observaciones)
+This function fits a parametric model whose parametric part is
+a geographically weigthed regression (GWR) while the non-parametric
+is a cubic spline global, to all observations
 }
 \examples{
 Ver viñeta.

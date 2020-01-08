@@ -4,8 +4,12 @@
 \alias{mggplot}
 \title{mggplot}
 \usage{
-mggplot(x, columnas = names(x), tipo = c("panel", "multiple"),
-  leyenda = c("bottom", "right"))
+mggplot(
+  x,
+  columnas = names(x),
+  tipo = c("panel", "multiple"),
+  leyenda = c("bottom", "right")
+)
 }
 \arguments{
 \item{x}{Lista de índices tal como los proporciona \code{ConsInd.} Puede ser una dataframe  (caso especial de lista).}
@@ -20,7 +24,7 @@ mggplot(x, columnas = names(x), tipo = c("panel", "multiple"),
 Llamada por su efecto secundario, consistente en generar los gráficos.
 }
 \description{
-Representar múltiples índices (típicamente de vueltos por la función \code{IndZonas}) en sendos paneles o superpuestos en un único panel.
+Representar múltiples índices (típicamente devueltos por la función \code{IndZonas}) en sendos paneles o superpuestos en un único panel.
 }
 \examples{
 Ver viñeta.

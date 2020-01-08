@@ -4,12 +4,19 @@
 \alias{ConsInd}
 \title{ConsInd}
 \usage{
-ConsInd(modelo = NULL, base = "2008-02-01", conf = 0.95,
-  fechas = NULL, tit = tit, ylabel = "Índice", plot = FALSE,
-  x.base)
+ConsInd(
+  modelo = NULL,
+  base = "2008-02-01",
+  conf = 0.95,
+  fechas = NULL,
+  tit = tit,
+  ylabel = "Índice",
+  plot = FALSE,
+  x.base
+)
 }
 \arguments{
-\item{modelo}{Modelo semiparamétrico estimado por \code{gam.}}
+\item{modelo}{Modelo semiparamétrico estimado por \code{g am.}}
 
 \item{base}{Fecha (día) tomada como base 100 del índice.}
 

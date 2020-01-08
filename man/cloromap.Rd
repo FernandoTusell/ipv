@@ -4,8 +4,19 @@
 \alias{cloromap}
 \title{cloromap}
 \usage{
-cloromap(sp, var.sp, df, var.df, var, sub.var = NULL, sub.set = NULL,
-  legend.title = NULL, logcolor = FALSE, graf.title = NULL, ...)
+cloromap(
+  sp,
+  var.sp,
+  df,
+  var.df,
+  var,
+  sub.var = NULL,
+  sub.set = NULL,
+  legend.title = NULL,
+  logcolor = FALSE,
+  graf.title = NULL,
+  ...
+)
 }
 \arguments{
 \item{sp}{Dataframe espacial, en cuyo slot @data está la variable \code{var.sp} definiendo los ámbitos sobre los que se agrega.}

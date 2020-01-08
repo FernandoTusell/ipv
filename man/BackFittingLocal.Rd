@@ -4,10 +4,22 @@
 \alias{BackFittingLocal}
 \title{Estimación semiparamétrica mediante 'backfitting' local.}
 \usage{
-BackFittingLocal(frm.param, smooth.term = "s(x,bs=\\"cr\\",k=24)",
-  cal.pts = NULL, datos, indice0, coords, var.fecha,
-  baseday = "2012-12-31", bw = 5000, bws = 10000, cores,
-  tol = 0.001, plotind = FALSE)
+BackFittingLocal(
+  frm.param,
+  smooth.term = "s(x,bs=\\"cr\\",k=24)",
+  cal.pts = NULL,
+  datos,
+  indice0,
+  coords,
+  var.fecha,
+  var.loc = NULL,
+  baseday = "2012-12-31",
+  bw = 5000,
+  bws = NULL,
+  cores,
+  tol = 0.001,
+  plotind = FALSE
+)
 }
 \arguments{
 \item{frm.param}{Fórmula de la parte paramétrica (GWR) del modelo.}
@@ -23,6 +35,8 @@ BackFittingLocal(frm.param, smooth.term = "s(x,bs=\\"cr\\",k=24)",
 \item{coords}{Coordenadas espaciales de las observaciones. Pueden ser geográficas (latitud y longitud) en cuyo caso se calcula distancia geodésica, o coordenadas de una proyección plana, en cuyo caso de emplea distancia euclídea ordinaria.}
 
 \item{var.fecha}{Variable que recoge la fecha de cada observación. Debe formar parte de \code{datos.}}
+
+\item{var.loc}{Variable que en el modelo base se emplea como proxy de la ubicación. Se elimina en el modelo que realiza GWR}
 
 \item{baseday}{Día en que se fija la base 100 del índice.}
 
