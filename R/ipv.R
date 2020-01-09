@@ -490,7 +490,7 @@ ConsInd <- function(modelo=NULL,base="2008-02-01",
 #' @param transX Transformation to be applied to varX (if any)
 #' @param transY Transformation to be applied to varY (if any)
 #'
-#' @return Merged data frame (or lines in X, y or both that cannot be matched)
+#' @return Data frame or merge of two data frames, with location names replaced by canonical names.
 #' @export
 #'
 #' @examples

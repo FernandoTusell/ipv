@@ -1,5 +1,5 @@
 ---
-title: "Ejemplos de uso de las funciones en el paquete 'ipv'"
+title: "Examples of use of functions in package 'ipv'"
 author: "F. Tusell"
 date: "`r Sys.Date()`"
 output: rmarkdown::html_vignette
@@ -15,20 +15,17 @@ options(width=120)
 ```
 
 
-En el proceso de examinar la viabilidad de un índice de precio de la vivienda para 
-la CAPV basado en información procedente del portal `idealista.com`, se ha hecho preciso escribir cierto número de funciones. Estas funciones se presentan recolectadas en el paquete `ipv`. 
+In the process of constructing a housing price index for the Basque Autonomous Community (CAPV) and certain of tis subareas using real estate data from web sources (mainly idealista.com), it has been necessary to write a number of functions, which are now collected in package `ipv`.
 
-Se trata de funciones perfectamente utilizables, pero que han sido escritas al albur del momento, para responder a necesidades momentáneas, y por tanto carecen del pulimento y del grado de comprobación que uno espera en un paquete precedido de
-análisis y estructurado desde el comienzo.
+These are spur-of-the-moment functions, which are usable andin fact have supported our work; but they lack de degree of polish and checking that oen would expect from a carefuly planned and designed package.
 
 
 ## Datos
 
-Los datos iniciales recibidos se han condensado en sendos ficheros (en formato
-`.rda`) de nombres `venta.dep.rda` y `alquiler.dep.rda`, en que el sufijo `dep`
-hace referencia a la depuración de valores anómalos, reincorporaciones de registros, 
-etc. Son ficheros muy voluminosos que residen en el directorio `data` del paquete,
-y pueden cargarse mediante:
+The data have been collected in two `.rda` files,  `venta.dep.rda` and `alquiler.dep.rda`.
+We have cleanned the raw data as made available to us by removing anomalous or repeated observations, etc. The files reside in the `data` folder of the package and can be loaded
+by typing:
+
 
 ```{r}
 library(ipv)
@@ -36,8 +33,11 @@ data("venta.dep")
 data("alquiler.dep")
 ```
 
+(Beware: if you are using a publicly available version of this package, such data may have been obscured, distorted and shuffled to preserve confidentiality. You will not be able to reproduce the results in this documentation, although the data provided will suffice to test
+the use of functions.)
+)
 
-Además del paquete `ipv` necesitaremos los que siguen. Son todos paquetes públicamente disponibles en CRAN.
+Other than package `ipv` we will nedd those following: all of them can be obtained from CRAN.
 
 ```{r}
 library(mgcv)
@@ -369,3 +369,63 @@ cloromap(sp=af, var.sp="A_FUNC_CAS", df=Obs, var.df="AF",
 Lo que es crucial para que lo anterior funcione es la correspondencia 1-1 entre
 los niveles de la variable `var.sp` de la dataframe espacial `sp`  y la variable
 `var.df` de la dataframe ordinaria `df`. El argumento `midpoint` da el valor "neutro" (codificado con blanco en la escala cromática divergente empleada), que habitualmente querremos hacer coincidir con la mediana de los valores, pero podemos fijar a nuestro antojo. 
+
+#### Fusion
+
+Quite often the names identifying locations are not homogeneous across sources, which
+makes it difficult to merge information from different files. The function `Fusion` tries to simplity life a bit in such situation. It can be used in both ways, with one or two dataframes.
+
+Whe used with one dataframe (which has to be 'X', de first argument), it scans the column
+named in `varX`, performs a match with the column `locX` in the translation dataframe `canon`, and overwrites `varX` with the canonical names in `canon` (or fills an NA if a match is not possible).
+
+This sort of invocation with a single dataframe is useful to aggregate. Assume a number of areas, some of which make part of the CAPV (Basque Autonomous Community) while others do not.
+If we want to aggregate CAPV and Non-CAPV areas, we could construct a translation dataframe
+`canon` as follows:
+
+```{r}
+canon <- data.frame(X=c("Bilbao","San Sebastian","Vitoria","Teruel","Soria"),
+                    Y=c("Bilbao","Donostia","Vitoria/Gazteiz", "Teruel","Soria"),
+                    Canon=c("CAPV","CAPV","CAPV","NoCAPV","NoCAPV"))
+canon
+```
+
+Now considera a dataframe such as:
+
+```{r}
+X     <- data.frame(a=c("Bilbao","San Sebastian","Vitoria","Teruel"),
+                    b=c(100,70,35,12))
+X
+```
+
+In order to reclassify observations in CAPV and Non-CAPV, we can invoke:
+
+```{r}
+Fusion(X, varX="a", locX=1, locCanon=3, canon=canon)
+```
+
+
+We may also invoke `Fusion` with two data frames, `X` and `Y`, each of them containing, among others, a variable "naming" records: these could be, for instance, names of municipalities, of streets, of districts, or neighbourhoods.
+For instance, besides `X` above we may have:
+
+```{r}
+Y     <- data.frame(e=c("Bilbao","Donostia","Vitoria/Gazteiz","Teruel","Soria"),
+                    g=c("F","G","H","J","K"))
+Y
+```
+
+Here the names of the communities (in column `e`) do not match those in column `a` of `X` above, although 
+we are referring to the same entities (e.g., Donostia is the same as San Sebastian). Merging directly the
+two dataframes `X` and `Y` would fail, but `Fusion` may be used:
+
+```{r}
+Fusion(X,Y,varX="a",varY="e",locX=1, locY=2, locCanon=2, canon=canon)
+```
+
+Above we are saying that we want to merge `X` and `Y` using the columns `a` and `e`, **after replacing their values by the canonical names in column `locCanon` of `canon`.** What this in effect does is to take the names in the dataframe
+`Y` as canonical. If `locCanon` is not stated, the canonical names would be taken from the column namec `Canon` in dataframe `canon`; this would not make much sense in this case:
+
+```{r}
+Fusion(X,Y,varX="a",varY="e",locX=1, locY=2, canon=canon)
+```
+
+A translation dataframe `canon` can contain any number of columns, affording flexibility in dealing with data from different sources, in different languages, character codes, etc.
