@@ -60,6 +60,5 @@ cuya parte no paramétrica está formada por un spline cúbico para cada
 ubicación. Esto permite el ajuste de tendencias locales
 }
 \examples{
-Ver viñeta.
 
 }

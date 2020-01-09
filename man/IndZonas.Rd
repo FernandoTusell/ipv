@@ -7,23 +7,22 @@
 IndZonas(datos, zonas, frm = NULL, base = "2008-01-01", plot = FALSE)
 }
 \arguments{
-\item{datos}{Dataframe de datos}
+\item{datos}{Dataframe of observations}
 
-\item{zonas}{Nombre de una columna de \code{datos} que define las zonas para las que se desea calcular los índices.}
+\item{zonas}{Name of the column of \code{datos} defining the areeas for which we want indices.}
 
-\item{frm}{Fórmula especificando el modelo base que quiere emplearse, en la forma esperada por \code{gam.} La fórmula es común a todos los índices computados por la función.}
+\item{frm}{Formula specifying the base model, in the notation expected by  \code{gam.} The formula is common to all indices computed byu the function.}
 
-\item{base}{Fecha base (índice=100). Es una fecha diaria en formato yyyy-mm-dd.}
+\item{base}{Base date (index=100). It is a day in format yyyy-mm-dd.}
 
-\item{plot}{\code{FALSE} (default) si no se desean gráficos, \code{TRUE} en caso contrario.}
+\item{plot}{\code{FALSE} (default) if no graphs are desired, \code{TRUE} otherwise.}
 }
 \value{
-Una lista con los índices calculados, en el formato en que los devuelve \code{ConsInd}.
+A list with the computed indices, in the format in which they are returned by \code{ConsInd}.
 }
 \description{
-Estimación de índices globales por zonas; es una mera función de utilidad que invoca reiteradamente  \code{ConsInd}.
+Estimation of global indices by areas; merely a wrapper around  \code{ConsInd}.
 }
 \examples{
-Ver viñeta
 
 }

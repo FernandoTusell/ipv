@@ -33,6 +33,5 @@ original contuviera los tres territorios de la CAPV, el resltado contendría la 
 por comarcas o áreas funcionales de sólo Bizkaia.
 }
 \examples{
-Ver viñeta
 
 }

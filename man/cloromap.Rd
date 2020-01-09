@@ -19,35 +19,34 @@ cloromap(
 )
 }
 \arguments{
-\item{sp}{Dataframe espacial, en cuyo slot @data está la variable \code{var.sp} definiendo los ámbitos sobre los que se agrega.}
+\item{sp}{Spatial dataframe, in whose @data slot variable \code{var.sp} defines the aggregation zones.}
 
-\item{var.sp}{Variable proporcionando la desagregación espacial.}
+\item{var.sp}{Variable whose values specify the spatail aggregation.}
 
-\item{df}{Dataframe ordinaria, conteniendo una variable \code{var.df} emparejable con \code{var.sp.}}
+\item{df}{Ordinary dataframe with variable \code{var.df} matching \code{var.sp.}}
 
-\item{var.df}{Variable emparejable con \code{var.sp}; ambas han de tener el mismo número de niveles e idénticamente nombrados.}
+\item{var.df}{Variable matching \code{var.sp}; both need to have the same levels.}
 
-\item{var}{Variable a representar. Debe ser una columna de \code{df.}}
+\item{var}{Variable to code with color. Must be a column of \code{df.}}
 
-\item{sub.var}{Variable de \code{sp} utilizada para definir un subconjunto de filas de la misma.}
+\item{sub.var}{Variable in \code{sp}, optionally used to subset \code{sp}.}
 
-\item{sub.set}{Vector de valores de \code{sub.var} que definen un subconjunto de filas de \code{sp}.}
+\item{sub.set}{Vector of values of \code{sub.var} defining a subser of rows of \code{sp}.}
 
-\item{legend.title}{Encabezamiento de la leyenda.}
+\item{legend.title}{Legend heading}
 
-\item{logcolor}{FALSE si la escala de color es lineal, TRUE si logarítmica}
+\item{logcolor}{FALSE if linear color scale, TRUE if logarithmic.}
 
-\item{graf.title}{Encabedzamiento del gráfico.}
+\item{graf.title}{Heading of the graph.}
 
-\item{...}{Parámetros adicionales a pasar a la función \code{ggplot} subyacente.}
+\item{...}{Optional additional parameters to pass to the underlying \code{ggplot} function.}
 }
 \value{
-Un mapa, en formato ggplot2, que por defecto se imprime.
+A map, of ggplot2 format, printed by default.
 }
 \description{
-Crea mapas codificando una variable de interés por zona con diferentes colores
+Creates cloropleth maps coding in color a variable.
 }
 \examples{
-Ver viñeta
 
 }

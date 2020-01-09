@@ -18,6 +18,5 @@ Un índice diario, sobre todos los días que van de \code{min(fechas)} a \code{m
 Dado un índice, definido sobre un conjunto de abscisas temporales con "huecos", define un nuevo índice interpolando los periodos sin observaciones.
 }
 \examples{
-Ver viñeta.
 
 }

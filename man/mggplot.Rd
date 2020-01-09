@@ -27,6 +27,5 @@ Llamada por su efecto secundario, consistente en generar los gráficos.
 Representar múltiples índices (típicamente devueltos por la función \code{IndZonas}) en sendos paneles o superpuestos en un único panel.
 }
 \examples{
-Ver viñeta.
 
 }

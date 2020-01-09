@@ -4,7 +4,18 @@
 \alias{Fusion}
 \title{Fusion}
 \usage{
-Fusion(X, Y, varX, varY, canon, transX = NULL, transY = NULL)
+Fusion(
+  X,
+  Y = NULL,
+  varX,
+  locX = 1,
+  varY,
+  locY = 2,
+  canon,
+  locCanon = NULL,
+  transX = NULL,
+  transY = NULL
+)
 }
 \arguments{
 \item{X}{First dataframe to merge}
@@ -13,16 +24,22 @@ Fusion(X, Y, varX, varY, canon, transX = NULL, transY = NULL)
 
 \item{varX}{Variable acting as key in X}
 
+\item{locX}{Column in \code{canon} against which to match values of column \code{varX} in \code{X}}
+
 \item{varY}{Variable acting as key in Y}
 
-\item{canon}{Correspondence between varX, varY and canonical value of the key}
+\item{locY}{Column in \code{canon} against which to match values of column \code{varY} in \code{Y}}
+
+\item{canon}{Correspondence between varX, varY and canonical value of the key (defaults to column 'Canon').}
+
+\item{locCanon}{Column in \code{canon} holding the canonical names. Defaults to column named 'Canon' if one exists and the argument is not set on call.}
 
 \item{transX}{Transformation to be applied to varX (if any)}
 
 \item{transY}{Transformation to be applied to varY (if any)}
 }
 \value{
-Merged data frame (or lines in X, y or both that cannot be matched)
+Data frame or merge of two data frames, with location names replaced by canonical names.
 }
 \description{
 Merge two dataframes using  \code{varX} and \code{varY} as keys. Since they may not be exactly alike,
@@ -30,23 +47,43 @@ Merge two dataframes using  \code{varX} and \code{varY} as keys. Since they may 
 to a canonical form after (optionally) transliterating to a common character encoding.
 }
 \examples{
-X     <- data.frame(a=c("Bilbao","San Sebastian","Vitoria","Terue"),
+X     <- data.frame(a=c("Bilbao","San Sebastian","Vitoria","Teruel"),
                     b=c("A","B","B","D"), d=c(TRUE,TRUE,FALSE,TRUE))
-Y     <- data.frame(e=c("Bilbao","Donostia","Vitoria/Gazteiz","Sorias"),
+X
+Y     <- data.frame(e=c("Bilbao","Donostia","Vitoria/Gazteiz","Soria"),
                     g=c("F","G","H","J"), h=c(TRUE,FALSE,TRUE,TRUE))
+Y
 canon <- data.frame(X=c("Bilbao","San Sebastian","Vitoria"),
                     Y=c("Bilbao","Donostia","Vitoria/Gazteiz"),
                     Canon=c("Bilbao","Donostia","Vitoria"))
-XY <- Fusion(X,Y,varX="a",varY="e",canon=canon)
+canon
 
-canon <- data.frame(X=c("Bilbao","San Sebastian","Vitoria","Teruel"),
-                    Y=c("Bilbao","Donostia","Vitoria/Gazteiz", "Teruel"),
-                    Canon=c("Bilbao","Donostia","Vitoria","Teruel"))
-XY <- Fusion(X,Y,varX="a",varY="e",canon=canon)
+Fusion(X, varX="a", locX=1, locCanon=3, canon=canon)
+
+Fusion(X=Y, varX="e", locX=2, locCanon=3, canon=canon)
+
+Fusion(X,Y,varX="a",varY="e",locX=1, locY=2, canon=canon)
 
 canon <- data.frame(X=c("Bilbao","San Sebastian","Vitoria","Teruel","Soria"),
                     Y=c("Bilbao","Donostia","Vitoria/Gazteiz", "Teruel","Soria"),
                     Canon=c("Bilbao","Donostia","Vitoria","Teruel","Soria"))
-XY <- Fusion(X,Y,varX="a",varY="e",canon=canon)
+
+Fusion(X, varX="a", locX=1, locCanon=3, canon=canon)
+
+Fusion(X=Y, varX="e", locX=2, locCanon=3, canon=canon)
+
+Fusion(X,Y,varX="a",varY="e",locX=1, locY=2, canon=canon)
+
+canon <- data.frame(X=c("Bilbao","San Sebastian","Vitoria","Teruel","Soria"),
+                    Y=c("Bilbao","Donostia","Vitoria/Gazteiz", "Teruel","Soria"),
+                    Canon=c("CAPV","CAPV","CAPV","NoCAPV","NoCAPV"))
+
+Fusion(X, varX="a", locX=1, locCanon=3, canon=canon)
+
+Fusion(X=Y, varX="e", locX=2, locCanon=3, canon=canon)
+
+# This hardly makes sense:
+
+Fusion(X, Y, varX="a", varY="e", locX=1, locY=2, locCanon=3, canon=canon)
 
 }

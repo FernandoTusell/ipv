@@ -41,6 +41,5 @@ extrae dicho término, lo completa para los días en que no haya observación, y
 si se desea. Se supone que la variable respuesta el log(Precio) o log(Precio/m2); el índice devuelto lo es para la variable Precio o Precio/m2, respectivamente, y datos fechados diariamente.
 }
 \examples{
-Ver viñeta.
 
 }

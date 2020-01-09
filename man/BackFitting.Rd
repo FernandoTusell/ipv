@@ -53,6 +53,5 @@ a geographically weigthed regression (GWR) while the non-parametric
 is a cubic spline global, to all observations
 }
 \examples{
-Ver viñeta.
 
 }
