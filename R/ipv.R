@@ -20,140 +20,140 @@
 #' @return Un índice de precios, con base en el día especificado, en formato de serie temporal \code{zoo.}
 #' @export
 #'
-#' @examples Ver viñeta.
+#' @examples
 #'
 BackFitting <- function(frm.param,
-                        smooth.term='s(x,bs="cr",k=24)',
-                        var.loc=NULL,
-                        datos,
-                        indice0,
-                        coords,
-                        var.fecha,
-                        baseday="2012-12-31",
-                        bw=5000,
-                        cores,
-                        tol=0.001,
-                        plotind=FALSE) {
-  require(mgcv)
-  require(spgwr)
-  require(parallel)
-  if (missing(cores))
-     cl <- makeCluster(detectCores())
-  else
-     cl <- makeCluster(cores)
-  resp  <- as.character(frm.param[[2]])
-  datos <- as.data.frame(datos)   #  Tibbles dan problemas
-  datos <- cbind(datos,y.orig=datos[,resp])
-  #
-  #  Modificadores de la fórmula y fragmentos: añadimos a
-  #  la parte paramétrica el(los  ) termino(s) suave(s) para
-  #  estimar el GAM inicial. Eliminamos las variables de
-  #  significado espacial de la fórmula a emplear en la
-  #  estimación GWR.
-  #
-  frm.global <- update(frm.param,
-                       eval(parse(text=paste("~ . + ",
-                                             smooth.term))))
-  if (!is.null(var.loc)) {
-  frm.gwr    <- update(frm.param,
-                       eval(parse(text=paste("~ . - ",
-                                             var.loc))))
-} else {
-  frm.gwr <- frm.param
-}
-  frm.tot    <- update(frm.param,
-                       eval(parse(text=paste("~ . + y.orig + ",
-                                             paste(c(coords,var.fecha),
-                                                   collapse="+")))))
-  frm.suav <- formula(eval(parse(text=paste(resp," ~  ", smooth.term))))
-  #
-  #  Creación de una SpatialDataFrame y selección de casos
-  #  completos para el backfitting. (gwr no admite NA's)
-  #
-  spdatos   <- get_all_vars(frm.tot, datos)
-  completos <- complete.cases(spdatos)
-  spdatos   <- spdatos[completos,]
-  coordinates(spdatos) <- eval(parse(text=paste("~ ",
-                                                paste(coords,
-                                                      collapse="+"))
-  )
-  )
-  #
-  x.base <- min(spdatos@data[,var.fecha])
-  spdatos@data <- cbind(spdatos@data,
-                        x=as.numeric(spdatos@data[,var.fecha, drop=TRUE] -
-                                       x.base
-                        )
-  )
-  x <- spdatos@data$x
-  #
-  #  Estimación modelo global semi-paramétrico para solución
-  #  inicial, si es que no se ha pasado 'indice0' entre los
-  #  argumentos.
-  #
-  if (missing(indice0)) {
-    mod.gam <- gam(formula=frm.global, data=spdatos@data)
-    indice0 <- ConsInd(modelo = mod.gam,
-                       fechas = spdatos@data[,var.fecha, drop=TRUE],
-                       base = baseday,
-                       plot=FALSE)
+                       smooth.term='s(x,bs="cr",k=24)',
+                       var.loc=NULL,
+                       datos,
+                       indice0,
+                       coords,
+                       var.fecha,
+                       baseday="2012-12-31",
+                       bw=5000,
+                       cores,
+                       tol=0.001,
+                       plotind=FALSE) {
+    require(mgcv)
+    require(spgwr)
+    require(parallel)
+    if (missing(cores))
+      cl <- makeCluster(detectCores())
+    else
+      cl <- makeCluster(cores)
+    resp  <- as.character(frm.param[[2]])
+    datos <- as.data.frame(datos)   #  Tibbles dan problemas
+    datos <- cbind(datos,y.orig=datos[,resp])
+    #
+    #  Modificadores de la fórmula y fragmentos: añadimos a
+    #  la parte paramétrica el(los  ) termino(s) suave(s) para
+    #  estimar el GAM inicial. Eliminamos las variables de
+    #  significado espacial de la fórmula a emplear en la
+    #  estimación GWR.
+    #
+    frm.global <- update(frm.param,
+                         eval(parse(text=paste("~ . + ",
+                                               smooth.term))))
+    if (!is.null(var.loc)) {
+      frm.gwr    <- update(frm.param,
+                           eval(parse(text=paste("~ . - ",
+                                                 var.loc))))
+    } else {
+      frm.gwr <- frm.param
+    }
+    frm.tot    <- update(frm.param,
+                         eval(parse(text=paste("~ . + y.orig + ",
+                                               paste(c(coords,var.fecha),
+                                                     collapse="+")))))
+    frm.suav <- formula(eval(parse(text=paste(resp," ~  ", smooth.term))))
+    #
+    #  Creación de una SpatialDataFrame y selección de casos
+    #  completos para el backfitting. (gwr no admite NA's)
+    #
+    spdatos   <- get_all_vars(frm.tot, datos)
+    completos <- complete.cases(spdatos)
+    spdatos   <- spdatos[completos,]
+    coordinates(spdatos) <- eval(parse(text=paste("~ ",
+                                                  paste(coords,
+                                                        collapse="+"))
+    )
+    )
+    #
+    x.base <- min(spdatos@data[,var.fecha])
+    spdatos@data <- cbind(spdatos@data,
+                          x=as.numeric(spdatos@data[,var.fecha, drop=TRUE] -
+                                         x.base
+                          )
+    )
+    x <- spdatos@data$x
+    #
+    #  Estimación modelo global semi-paramétrico para solución
+    #  inicial, si es que no se ha pasado 'indice0' entre los
+    #  argumentos.
+    #
+    if (missing(indice0)) {
+      mod.gam <- gam(formula=frm.global, data=spdatos@data)
+      indice0 <- ConsInd(modelo = mod.gam,
+                         fechas = spdatos@data[,var.fecha, drop=TRUE],
+                         base = baseday,
+                         plot=FALSE)
+    }
+    #
+    #  Comienza ahora la alternancia entre estimaciones de la
+    #  parte paramétrica y no paramétrica del modelo, hasta
+    #  (esperamos) convergencia
+    #
+    newind <- indice0 ; lastind <- 0 * newind ; iter <-0
+    #
+    #  Mientras la máxima discrepancia entre dos índices
+    #  sucesivos sea pequeña, continúav
+    #
+    while( max(abs(newind-lastind)) > tol * max(abs(newind)) ) {
+      iter <- iter + 1
+      lastind <- newind
+      #
+      #  Deflactamos los datos con el índice provisional
+      #
+      deflactor <- log(lastind / 100)
+      tmp       <- match(spdatos@data[,var.fecha,drop=TRUE],
+                         index(deflactor))
+      spdatos@data[,resp] <-
+        spdatos@data[,"y.orig"] - coredata(deflactor[tmp])
+      #
+      #  Ajustamos un modelo espacial a los datos deflactados;
+      #  los valores ajustados, en mod.gwr$SDF@data$pred
+      #
+      mod.gwr      <- gwr(frm.gwr, data=spdatos, bandwidth=bw,
+                          fit.points=spdatos, hatmatrix=FALSE,
+                          gweight=gwr.Gauss,
+                          predictions=TRUE,
+                          cl=cl)
+      #
+      #  Los residuos del modelo espacial, a datos[,resp]
+      #
+      spdatos@data[,resp] <- spdatos@data[,"y.orig"] - mod.gwr$SDF@data$pred
+      #
+      #  Ajustamos un spline a datos[,resp]
+      #
+      mod.gam <- gam(frm.suav, data=spdatos@data)
+      newind  <- ConsInd(modelo = mod.gam,
+                         fechas = spdatos@data[,var.fecha, drop=TRUE],
+                         base = baseday,
+                         plot=plotind,
+                         x.base=x.base)
+      cat("Backfitting iteración ",iter,"\n")
+    }
+    stopCluster(cl)
+    #
+    #  Finalizado el ajuste, representamos el índice si plotind=TRUE
+    #
+    ConsInd(modelo = mod.gam,
+            fechas = spdatos@data[,var.fecha, drop=TRUE],
+            base = baseday,
+            plot=plotind,
+            x.base=x.base)
+    return(newind)
   }
-  #
-  #  Comienza ahora la alternancia entre estimaciones de la
-  #  parte paramétrica y no paramétrica del modelo, hasta
-  #  (esperamos) convergencia
-  #
-  newind <- indice0 ; lastind <- 0 * newind ; iter <-0
-  #
-  #  Mientras la máxima discrepancia entre dos índices
-  #  sucesivos sea pequeña, continúav
-  #
-  while( max(abs(newind-lastind)) > tol * max(abs(newind)) ) {
-    iter <- iter + 1
-    lastind <- newind
-    #
-    #  Deflactamos los datos con el índice provisional
-    #
-    deflactor <- log(lastind / 100)
-    tmp       <- match(spdatos@data[,var.fecha,drop=TRUE],
-                       index(deflactor))
-    spdatos@data[,resp] <-
-      spdatos@data[,"y.orig"] - coredata(deflactor[tmp])
-    #
-    #  Ajustamos un modelo espacial a los datos deflactados;
-    #  los valores ajustados, en mod.gwr$SDF@data$pred
-    #
-    mod.gwr      <- gwr(frm.gwr, data=spdatos, bandwidth=bw,
-                        fit.points=spdatos, hatmatrix=FALSE,
-                        gweight=gwr.Gauss,
-                        predictions=TRUE,
-                        cl=cl)
-    #
-    #  Los residuos del modelo espacial, a datos[,resp]
-    #
-    spdatos@data[,resp] <- spdatos@data[,"y.orig"] - mod.gwr$SDF@data$pred
-    #
-    #  Ajustamos un spline a datos[,resp]
-    #
-    mod.gam <- gam(frm.suav, data=spdatos@data)
-    newind  <- ConsInd(modelo = mod.gam,
-                       fechas = spdatos@data[,var.fecha, drop=TRUE],
-                       base = baseday,
-                       plot=plotind,
-                       x.base=x.base)
-    cat("Backfitting iteración ",iter,"\n")
-  }
-  stopCluster(cl)
-  #
-  #  Finalizado el ajuste, representamos el índice si plotind=TRUE
-  #
-  ConsInd(modelo = mod.gam,
-          fechas = spdatos@data[,var.fecha, drop=TRUE],
-          base = baseday,
-          plot=plotind,
-          x.base=x.base)
-  return(newind)
-}
 
 
 #' Estimación semiparamétrica mediante 'backfitting' local.
@@ -181,7 +181,7 @@ BackFitting <- function(frm.param,
 #' @return Una lista de índices de precios, con base en el día especificado, en formato de serie temporal \code{zoo;} uníndice para cada punto especificado en \code{cal.pts}.
 #' @export
 #'
-#' @examples Ver viñeta.
+#' @examples
 #'
 BackFittingLocal <- function(frm.param,
                              smooth.term='s(x,bs="cr",k=24)',
@@ -336,24 +336,24 @@ frm.suav <- formula(eval(parse(text=paste(resp," ~  ", smooth.term))))
 
 #' cloromap
 #'
-#' Crea mapas codificando una variable de interés por zona con diferentes colores
+#' Creates cloropleth maps coding in color a variable.
 #'
-#' @param sp Dataframe espacial, en cuyo slot @data está la variable \code{var.sp} definiendo los ámbitos sobre los que se agrega.
-#' @param var.sp Variable proporcionando la desagregación espacial.
-#' @param df Dataframe ordinaria, conteniendo una variable \code{var.df} emparejable con \code{var.sp.}
-#' @param var.df Variable emparejable con \code{var.sp}; ambas han de tener el mismo número de niveles e idénticamente nombrados.
-#' @param var Variable a representar. Debe ser una columna de \code{df.}
-#' @param sub.var Variable de \code{sp} utilizada para definir un subconjunto de filas de la misma.
-#' @param sub.set Vector de valores de \code{sub.var} que definen un subconjunto de filas de \code{sp}.
-#' @param legend.title Encabezamiento de la leyenda.
-#' @param logcolor FALSE si la escala de color es lineal, TRUE si logarítmica
-#' @param graf.title Encabedzamiento del gráfico.
-#' @param ... Parámetros adicionales a pasar a la función \code{ggplot} subyacente.
+#' @param sp Spatial dataframe, in whose @data slot variable \code{var.sp} defines the aggregation zones.
+#' @param var.sp Variable whose values specify the spatail aggregation.
+#' @param df Ordinary dataframe with variable \code{var.df} matching \code{var.sp.}
+#' @param var.df Variable matching \code{var.sp}; both need to have the same levels.
+#' @param var Variable to code with color. Must be a column of \code{df.}
+#' @param sub.var Variable in \code{sp}, optionally used to subset \code{sp}.
+#' @param sub.set Vector of values of \code{sub.var} defining a subser of rows of \code{sp}.
+#' @param legend.title Legend heading
+#' @param logcolor FALSE if linear color scale, TRUE if logarithmic.
+#' @param graf.title Heading of the graph.
+#' @param ... Optional additional parameters to pass to the underlying \code{ggplot} function.
 #'
-#' @return Un mapa, en formato ggplot2, que por defecto se imprime.
+#' @return A map, of ggplot2 format, printed by default.
 #' @export
 #'
-#' @examples Ver viñeta
+#' @examples
 #'
 cloromap <- function(sp, var.sp,
                      df, var.df,
@@ -398,7 +398,7 @@ cloromap <- function(sp, var.sp,
 #' @return Un índice diario, sobre todos los días que van de \code{min(fechas)} a \code{max(fechas).}
 #' @export
 #'
-#' @examples Ver viñeta.
+#' @examples
 #'
 CompFechas <- function(indice,fechas) {
   scratch <- zoo(0,order.by=seq.Date(from=min(fechas),to=max(fechas)+1,by="day"))
@@ -424,7 +424,7 @@ CompFechas <- function(indice,fechas) {
 #' @return Un indice en formato \code{zoo}, que opcionalmente (plot=TRUE) es representado gráficamente.
 #' @export
 #'
-#' @examples Ver viñeta.
+#' @examples
 #'
 ConsInd <- function(modelo=NULL,base="2008-02-01",
                     conf=0.95,
@@ -479,11 +479,14 @@ ConsInd <- function(modelo=NULL,base="2008-02-01",
 #' \code{canon} contains a dataframe which enables translation of either key
 #' to a canonical form after (optionally) transliterating to a common character encoding.
 #'
-#' @param X  First dataframe to merge
-#' @param Y  Second dataframe to merge
-#' @param varX  Variable acting as key in X
-#' @param varY  Variable acting as key in Y
-#' @param canon Correspondence between varX, varY and canonical value of the key
+#' @param X First dataframe to merge
+#' @param Y Second dataframe to merge
+#' @param varX Variable acting as key in X
+#' @param varY Variable acting as key in Y
+#' @param locX Column in \code{canon} against which to match values of column \code{varX} in \code{X}
+#' @param locY Column in \code{canon} against which to match values of column \code{varY} in \code{Y}
+#' @param locCanon Column in \code{canon} holding the canonical names. Defaults to column named 'Canon' if one exists and the argument is not set on call.
+#' @param canon Correspondence between varX, varY and canonical value of the key (defaults to column 'Canon').
 #' @param transX Transformation to be applied to varX (if any)
 #' @param transY Transformation to be applied to varY (if any)
 #'
@@ -491,89 +494,117 @@ ConsInd <- function(modelo=NULL,base="2008-02-01",
 #' @export
 #'
 #' @examples
-#' X     <- data.frame(a=c("Bilbao","San Sebastian","Vitoria","Terue"),
+#' X     <- data.frame(a=c("Bilbao","San Sebastian","Vitoria","Teruel"),
 #'                     b=c("A","B","B","D"), d=c(TRUE,TRUE,FALSE,TRUE))
-#' Y     <- data.frame(e=c("Bilbao","Donostia","Vitoria/Gazteiz","Sorias"),
+#' X
+#' Y     <- data.frame(e=c("Bilbao","Donostia","Vitoria/Gazteiz","Soria"),
 #'                     g=c("F","G","H","J"), h=c(TRUE,FALSE,TRUE,TRUE))
+#' Y
 #' canon <- data.frame(X=c("Bilbao","San Sebastian","Vitoria"),
 #'                     Y=c("Bilbao","Donostia","Vitoria/Gazteiz"),
 #'                     Canon=c("Bilbao","Donostia","Vitoria"))
-#' XY <- Fusion(X,Y,varX="a",varY="e",canon=canon)
+#' canon
 #'
-#' canon <- data.frame(X=c("Bilbao","San Sebastian","Vitoria","Teruel"),
-#'                     Y=c("Bilbao","Donostia","Vitoria/Gazteiz", "Teruel"),
-#'                     Canon=c("Bilbao","Donostia","Vitoria","Teruel"))
-#' XY <- Fusion(X,Y,varX="a",varY="e",canon=canon)
+#' Fusion(X, varX="a", locX=1, locCanon=3, canon=canon)
+#'
+#' Fusion(X=Y, varX="e", locX=2, locCanon=3, canon=canon)
+#'
+#' Fusion(X,Y,varX="a",varY="e",locX=1, locY=2, canon=canon)
 #'
 #' canon <- data.frame(X=c("Bilbao","San Sebastian","Vitoria","Teruel","Soria"),
 #'                     Y=c("Bilbao","Donostia","Vitoria/Gazteiz", "Teruel","Soria"),
 #'                     Canon=c("Bilbao","Donostia","Vitoria","Teruel","Soria"))
-#' XY <- Fusion(X,Y,varX="a",varY="e",canon=canon)
+#'
+#' Fusion(X, varX="a", locX=1, locCanon=3, canon=canon)
+#'
+#' Fusion(X=Y, varX="e", locX=2, locCanon=3, canon=canon)
+#'
+#' Fusion(X,Y,varX="a",varY="e",locX=1, locY=2, canon=canon)
+#'
+#' canon <- data.frame(X=c("Bilbao","San Sebastian","Vitoria","Teruel","Soria"),
+#'                     Y=c("Bilbao","Donostia","Vitoria/Gazteiz", "Teruel","Soria"),
+#'                     Canon=c("CAPV","CAPV","CAPV","NoCAPV","NoCAPV"))
+#'
+#' Fusion(X, varX="a", locX=1, locCanon=3, canon=canon)
+#'
+#' Fusion(X=Y, varX="e", locX=2, locCanon=3, canon=canon)
+#'
+#' # This hardly makes sense:
+#'
+#' Fusion(X, Y, varX="a", varY="e", locX=1, locY=2, locCanon=3, canon=canon)
 #'
 Fusion <- function(X,
-                   Y,
-                   varX,
-                   varY,
-                   canon,
+                   Y=NULL,
+                   varX, locX=1,
+                   varY, locY=2,
+                   canon, locCanon=NULL,
                    transX = NULL,
                    transY = NULL)
 {
   #
-  # Make local copies
+  #  Use default, if canonical column has not been specified
   #
-  tmp.varX <- X
-  tmp.varY <- Y
+  if (is.null(locCanon))
+    locCanon=match("Canon",colnames(canon))
   #
   #  Transliterate as needed
   #
   if (!is.null(transX))
-    tmp.varX[, varX] <-
-    iconv(x = tmp.varX[, varX], from = transX, to = "utf8")
+    X[, varX] <-
+    iconv(x = X[, varX], from = transX, to = "utf8")
   if (!is.null(transY))
-    tmp.varY[, varY] <-
-    iconv(x = tmp.varY[, varY], from = transY, to = "utf8")
+    Y[, varY] <-
+    iconv(x = Y[, varY], from = transY, to = "utf8")
   #
   #  Match key varX and replace by canonical values
   #
-  tmp <- match(tmp.varX[, varX], canon[, "X"])
+  tmp <- match(X[, varX], canon[, locX])
   if (any(is.na(tmp))) {
     cat("\nThe following values of varX could not be matched:\n")
-    cat(as.character(tmp.varX[is.na(tmp),varX]),"\n")
+    cat(as.character(X[is.na(tmp),varX]),"\n")
   }
-  tX <- ifelse(!is.na(tmp), canon[tmp, "Canon"], NA)
-  if (is.factor(canon[tmp, "Canon"]))
-    tmp.varX[, varX] <- factor(levels(canon[tmp, "Canon"])[tX])
-
+  tX <- ifelse(!is.na(tmp), canon[tmp, locCanon], NA)
+  if (is.factor(canon[tmp, locCanon]))
+    X[, varX] <- factor(levels(canon[tmp, locCanon])[tX])
   #
-  #  Do likewise for key varY
+  #  Do likewise for key varY, if second argument is given
   #
-  tmp <- match(tmp.varY[, varY], canon[, "Y"])
+  if (!is.null(Y)) {
+  tmp <- match(Y[, varY], canon[, locY])
   if (any(is.na(tmp))) {
     cat("\nThe following values of varY could not be matched:\n")
-    cat(as.character(tmp.varY[is.na(tmp),varY],"\n"))
+    cat(as.character(Y[is.na(tmp),varY],"\n"))
   }
-  tY <- ifelse(!is.na(tmp), canon[tmp, "Canon"], NA)
-  if (is.factor(canon[tmp, "Canon"]))
-    tmp.varY[, varY] <- factor(levels(canon[tmp, "Canon"])[tY])
-
-  tmp <- merge(x=tmp.varX, y=tmp.varY, by.x=varX, by.y=varY, all=TRUE)
+  tY <- ifelse(!is.na(tmp), canon[tmp, locCanon], NA)
+  if (is.factor(canon[tmp, locCanon]))
+    Y[, varY] <- factor(levels(canon[tmp, locCanon])[tY])
+  }
+  #
+  #  If two data frames 'x' and 'y' were passed, merge them to return,
+  #  else return the first with the key replaced by canonical names
+  #
+  if (!is.null(Y))
+    tmp <- merge(x=X, y=Y, by.x=varX, by.y=varY, all=TRUE)
+  else
+    tmp <- X
+  #
   return(tmp[!is.na(tmp[,varX]),])
 }
 
 
 #' IndZonas
 #'
-#' Estimación de índices globales por zonas; es una mera función de utilidad que invoca reiteradamente  \code{ConsInd}.
-#' @param datos Dataframe de datos
-#' @param zonas Nombre de una columna de \code{datos} que define las zonas para las que se desea calcular los índices.
-#' @param frm Fórmula especificando el modelo base que quiere emplearse, en la forma esperada por \code{gam.} La fórmula es común a todos los índices computados por la función.
-#' @param base Fecha base (índice=100). Es una fecha diaria en formato yyyy-mm-dd.
-#' @param plot \code{FALSE} (default) si no se desean gráficos, \code{TRUE} en caso contrario.
+#' Estimation of global indices by areas; merely a wrapper around  \code{ConsInd}.
+#' @param datos Dataframe of observations
+#' @param zonas Name of the column of \code{datos} defining the areeas for which we want indices.
+#' @param frm Formula specifying the base model, in the notation expected by  \code{gam.} The formula is common to all indices computed byu the function.
+#' @param base Base date (index=100). It is a day in format yyyy-mm-dd.
+#' @param plot \code{FALSE} (default) if no graphs are desired, \code{TRUE} otherwise.
 #'
-#' @return Una lista con los índices calculados, en el formato en que los devuelve \code{ConsInd}.
+#' @return A list with the computed indices, in the format in which they are returned by \code{ConsInd}.
 #' @export
 #'
-#' @examples Ver viñeta
+#' @examples
 #'
 IndZonas <- function(datos,
                      zonas,
@@ -609,7 +640,7 @@ IndZonas <- function(datos,
 #' @return Llamada por su efecto secundario, consistente en generar los gráficos.
 #' @export
 #'
-#' @examples Ver viñeta.
+#' @examples
 #'
 mggplot <- function(x, columnas=names(x),
                     tipo=c("panel","multiple"),
@@ -656,7 +687,7 @@ mggplot <- function(x, columnas=names(x),
 #' @return Una dataframe espacial de polígonos para los ámbitos agregados.
 #' @export
 #'
-#' @examples Ver viñeta
+#' @examples
 #'
 pols <- function(base, sub.var=NULL, sub.set=NULL,
                  var.agreg=NULL) {

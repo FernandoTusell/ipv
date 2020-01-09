@@ -1,11 +1,11 @@
 Package: ipv
 Type: Package
 Title: Computation of housing price indices
-Version: 0.1.3
+Version: 0.1.4
 Author: F. Tusell
 Maintainer: F. Tusell <fernando.tusell@ehu.es>
-Description: Computation of price indices from information in the web portal idealista.com.
-    The implementation is geared to a particular application and source of information, but we have attempted to write functions in a way that make their adaptation to other settings feasible.
+Description: Computation of price indices from information in the web portal idealista.com and bail data.
+    The implementation is geared towards a particular application and sources of information, but we have attempted to write functions in a way that make their adaptation to other settings feasible.
 License: GPL-3
 Encoding: UTF-8
 LazyData: true
