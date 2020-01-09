@@ -35,7 +35,7 @@ data("alquiler.dep")
 
 (Beware: if you are using a publicly available version of this package, such data may have been obscured, distorted and shuffled to preserve confidentiality. You will not be able to reproduce the results in this documentation, although the data provided will suffice to test
 the use of functions.)
-)
+
 
 Other than package `ipv` we will nedd those following: all of them can be obtained from CRAN.
 
@@ -57,7 +57,13 @@ El paquete posibilita estimar índices a partir de dos tipos de modelos:
 1. Modelos globales: son modelos en que los parámetros toman el mismo valor en el ajuste de todas las observaciones del ámbito. Como los valores son muy dependientes 
 de la localización, se emplea como proxy de la misma alguna variable como `AF` (área funcional), `SUBREGION`, etc. 
 2. Modelos geogràficamente ponderados (GWR): son modelos en que los parámetros varían en el espacio. El efecto, e.g., de poseer un garaje una vivienda no es
-identico para todas las viviendas en un ámbito, como en el caso de los modelos globales, sino que varía con las coordenadas de la vivienda. Ello permitiría, con muestra suficiente, valoraciones incluso variando con cada portal.
+identico para todas las viviendas en un ámbito, comPackage: ipv
+Type: Package
+Title: Computation of housing price indices
+Version: 0.1.4
+Author: F. Tusell
+Maintainer: F. Tusell <fernando.tusell@ehu.es>
+Description: Computation of price indo en el caso de los modelos globales, sino que varía con las coordenadas de la vivienda. Ello permitiría, con muestra suficiente, valoraciones incluso variando con cada portal.
 
 En ambos casos se añade una tendencia no paramétrica, a partir de la cual se 
 calculan los índices.
