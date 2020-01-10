@@ -1,5 +1,5 @@
 ---
-title: "Examples of use of functions in package 'ipv'"
+title: "Use of some functions in package 'ipv'"
 author: "F. Tusell"
 date: "`r Sys.Date()`"
 output: rmarkdown::html_vignette
@@ -15,9 +15,9 @@ options(width=120)
 ```
 
 
-In the process of constructing a housing price index for the Basque Autonomous Community (CAPV) and certain of tis subareas using real estate data from web sources (mainly idealista.com), it has been necessary to write a number of functions, which are now collected in package `ipv`.
+In the process of constructing a housing price index for the Basque Autonomous Community (CAPV) and certain of its subareas using real estate data from web sources (mainly idealista.com), it has been necessary to write a number of functions, which are now collected in package `ipv`.
 
-These are spur-of-the-moment functions, which are usable andin fact have supported our work; but they lack de degree of polish and checking that oen would expect from a carefuly planned and designed package.
+These are spur-of-the-moment functions, which are usable and in fact have supported our work; but they lack de degree of polish and checking that oen would expect from a carefuly planned and designed package.
 
 
 ## Datos
@@ -33,11 +33,11 @@ data("venta.dep")
 data("alquiler.dep")
 ```
 
-(Beware: if you are using a publicly available version of this package, such data may have been obscured, distorted and shuffled to preserve confidentiality. You will not be able to reproduce the results in this documentation, although the data provided will suffice to test
+(*Beware*: if you are using a publicly available version of this package, such data may have been obscured, distorted and shuffled to preserve confidentiality. You will not be able to reproduce the results in this vignette, although the data provided will suffice to test
 the use of functions.)
 
 
-Other than package `ipv` we will nedd those following: all of them can be obtained from CRAN.
+Other than package `ipv` we will need those following: all of them can be obtained from CRAN.
 
 ```{r}
 library(mgcv)
@@ -49,26 +49,29 @@ library(spgwr)
 library(zoo)
 ```
 
-## Estimación de modelos
+## Model estimation
 
 
-El paquete posibilita estimar índices a partir de dos tipos de modelos: 
+The package targets two types of models for housing price indices estimation:
 
-1. Modelos globales: son modelos en que los parámetros toman el mismo valor en el ajuste de todas las observaciones del ámbito. Como los valores son muy dependientes 
-de la localización, se emplea como proxy de la misma alguna variable como `AF` (área funcional), `SUBREGION`, etc. 
-2. Modelos geogràficamente ponderados (GWR): son modelos en que los parámetros varían en el espacio. El efecto, e.g., de poseer un garaje una vivienda no es
-identico para todas las viviendas en un ámbito, comPackage: ipv
-Type: Package
-Title: Computation of housing price indices
-Version: 0.1.4
-Author: F. Tusell
-Maintainer: F. Tusell <fernando.tusell@ehu.es>
-Description: Computation of price indo en el caso de los modelos globales, sino que varía con las coordenadas de la vivienda. Ello permitiría, con muestra suficiente, valoraciones incluso variando con cada portal.
+1. Global models plus non-parametric tendency: these are models where parameters of the hedonic part are common to the whole area of estimation.
+Location does matter in prices, but it enters the model via a proxy like `SUBREGION`, `AF` (functional area), etc.
+The general form of a global model would be:
 
-En ambos casos se añade una tendencia no paramétrica, a partir de la cual se 
-calculan los índices.
+$$ \log(\textrm{Precio/m2})_{it} = \sum_{i=1}^K\beta_jx_{ij} + \sum_{l=1}^L\beta_{l}\textrm{loc}_{il} + s(t) + \epsilon_{i} $$
+2. Geographically weighted regression models (GWR) plus non-parametric trend: 
+these are models where the parameters change across the space.
+The effect in the price of a dwelling of including a garage, for instance, is not the same across space, and the model takes these into account. The general form of a GWR witt non-parametric trend is:
 
-Preparamos los datos así:
+$$ \log(\textrm{Precio/m2})_{it} = \sum_{i=1}^K\beta_jx(u_i,v_i)_{ij}  + s(t) + \epsilon_{i} $$
+Here the location dummies have disappeared and the betas of the hedonic part are depenedent on the coordinates
+$u_i,v_i.
+
+Both types of models have a hedonic part for quality correction and a non-parametric tendency, from which the price index is derived. Although not imperative, it makes more sense to take prices in the log scale and per unit of surface (square foot or square meter) of the dwelling.
+
+We prepare the data computing the log price per unit of surface, an auxiliary time variable `x` 
+(days elapsed from the 
+date of the oldest observation in the sample) and filtering out observations for which no geographical information is available in coordinates `DX_ETRS89` and `DY_ETRS89`:
 
 ```{r PrepDatos}
 datos <- venta.dep %>% 
@@ -78,15 +81,11 @@ datos <- venta.dep %>%
   as.data.frame()
 ```
 
- La variable `x` no es más que el número de días transcurrido desde la primera fecha disponible en la muestra. Se eliminan las observaciones que no están geolocalizadas, pues aunque las coordenadas
-no hacen falta en un modelo global, sí son necesarias en un modelo geográficamente ponderado (GWR).
+Geographical coordinates are not needed in a global model, but are required for a GWR model.
 
+### Global models
 
-### Modelos globales
-
-
-
-Los modelos se estiman mediante la función `gam`. Por ejemplo,
+Global models are estimated using function `gam`. For instance,
 
 
 ```{r ModeloGlobal}
@@ -96,12 +95,12 @@ mod1 <- gam( logpm2 ~   SUBREGION + ROOMNUMBER + HASLIFT +
               data=datos)
 ```
 
-Es decisión del analista cuántas y cuáles variables incluir; deseamos, evidentemente, un modelo tan descriptivo como sea posible y que incorpore 
-el máximo de variables capaces de describir la calidad de cada inmueble. No obstante, la presencia de valores perdidos hace que un modelo muy ambicioso
-haya de prescindir de gran parte de la muestra (porque hay variables muy poco observadas). El parámetro `k` es el número de grados de libertad equivalentes:
-`s(x, bs="cr", k=16)` es un **spline** cúbico con esos grados de libertad. Uno o dos grados de libertad por año es por lo general suficiente y proporciona más que suficiente flexibilidad en el ajuste.
+It is up to the analyst to decide which variables to include. Clearly, we want a model as descriptive as posible,
+incorporating each variable which conceivably is descriptive of the quality of the dwellings; however, too ambitious a model will force to discard many observations for which the included variables are not observed. The `k` parameter
+is the equivalent number of degrees of freedom (EDF): we have found one or two per year to be plenty.
+`s(x, bs="cr", k=16)` is a cubic **spline** with the prescribed degrees of freedom.
 
-Podemos inspeccionar el resultado mediante
+Results can be inspected by:
 
 ```{r, ResultadosModeloGlobal}
 summary(mod1)
@@ -111,8 +110,7 @@ anova(mod1)
 
 #### ConsInd
 
-El objeto devuelto por `gam` es cuanto necesitamos para calcular el índice,
-haciendo uso de la función `ConsInd`:
+The object returned by `gam` is all we need to compute the index, using function  `ConsInd`:
 
 ```{r, ZonasViaSUBREGION}
 ind <- ConsInd(modelo=mod1, base="2007-12-31", 

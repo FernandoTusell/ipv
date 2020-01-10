@@ -12,9 +12,9 @@
 
 <meta name="author" content="F. Tusell" />
 
-<meta name="date" content="2020-01-09" />
+<meta name="date" content="2020-01-10" />
 
-<title>Examples of use of functions in package ipv</title>
+<title>Use of some functions in package ipv</title>
 
 
 
@@ -93,22 +93,22 @@ code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Inf
 
 
 
-<h1 class="title toc-ignore">Examples of use of functions in package ‘ipv’</h1>
+<h1 class="title toc-ignore">Use of some functions in package ‘ipv’</h1>
 <h4 class="author">F. Tusell</h4>
-<h4 class="date">2020-01-09</h4>
+<h4 class="date">2020-01-10</h4>
 
 
 
-<p>In the process of constructing a housing price index for the Basque Autonomous Community (CAPV) and certain of tis subareas using real estate data from web sources (mainly idealista.com), it has been necessary to write a number of functions, which are now collected in package <code>ipv</code>.</p>
-<p>These are spur-of-the-moment functions, which are usable andin fact have supported our work; but they lack de degree of polish and checking that oen would expect from a carefuly planned and designed package.</p>
+<p>In the process of constructing a housing price index for the Basque Autonomous Community (CAPV) and certain of its subareas using real estate data from web sources (mainly idealista.com), it has been necessary to write a number of functions, which are now collected in package <code>ipv</code>.</p>
+<p>These are spur-of-the-moment functions, which are usable and in fact have supported our work; but they lack de degree of polish and checking that oen would expect from a carefuly planned and designed package.</p>
 <div id="datos" class="section level2">
 <h2>Datos</h2>
 <p>The data have been collected in two <code>.rda</code> files, <code>venta.dep.rda</code> and <code>alquiler.dep.rda</code>. We have cleanned the raw data as made available to us by removing anomalous or repeated observations, etc. The files reside in the <code>data</code> folder of the package and can be loaded by typing:</p>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">library</span>(ipv)
 <span class="kw">data</span>(<span class="st">&quot;venta.dep&quot;</span>)
 <span class="kw">data</span>(<span class="st">&quot;alquiler.dep&quot;</span>)</code></pre></div>
-<p>(Beware: if you are using a publicly available version of this package, such data may have been obscured, distorted and shuffled to preserve confidentiality. You will not be able to reproduce the results in this documentation, although the data provided will suffice to test the use of functions.) )</p>
-<p>Other than package <code>ipv</code> we will nedd those following: all of them can be obtained from CRAN.</p>
+<p>(<em>Beware</em>: if you are using a publicly available version of this package, such data may have been obscured, distorted and shuffled to preserve confidentiality. You will not be able to reproduce the results in this vignette, although the data provided will suffice to test the use of functions.)</p>
+<p>Other than package <code>ipv</code> we will need those following: all of them can be obtained from CRAN.</p>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">library</span>(mgcv)
 <span class="kw">library</span>(tidyverse, <span class="dt">verbose=</span><span class="ot">FALSE</span>)
 <span class="kw">library</span>(sp)
@@ -117,30 +117,31 @@ code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Inf
 <span class="kw">library</span>(spgwr)
 <span class="kw">library</span>(zoo)</code></pre></div>
 </div>
-<div id="estimación-de-modelos" class="section level2">
-<h2>Estimación de modelos</h2>
-<p>El paquete posibilita estimar índices a partir de dos tipos de modelos:</p>
+<div id="model-estimation" class="section level2">
+<h2>Model estimation</h2>
+<p>The package targets two types of models for housing price indices estimation:</p>
 <ol style="list-style-type: decimal">
-<li>Modelos globales: son modelos en que los parámetros toman el mismo valor en el ajuste de todas las observaciones del ámbito. Como los valores son muy dependientes de la localización, se emplea como proxy de la misma alguna variable como <code>AF</code> (área funcional), <code>SUBREGION</code>, etc.</li>
-<li>Modelos geogràficamente ponderados (GWR): son modelos en que los parámetros varían en el espacio. El efecto, e.g., de poseer un garaje una vivienda no es identico para todas las viviendas en un ámbito, como en el caso de los modelos globales, sino que varía con las coordenadas de la vivienda. Ello permitiría, con muestra suficiente, valoraciones incluso variando con cada portal.</li>
+<li>Global models plus non-parametric tendency: these are models where parameters of the hedonic part are common to the whole area of estimation. Location does matter in prices, but it enters the model via a proxy like <code>SUBREGION</code>, <code>AF</code> (functional area), etc. The general form of a global model would be:</li>
 </ol>
-<p>En ambos casos se añade una tendencia no paramétrica, a partir de la cual se calculan los índices.</p>
-<p>Preparamos los datos así:</p>
+<p><span class="math display">\[ \log(\textrm{Precio/m2})_{it} = \sum_{i=1}^K\beta_jx_{ij} + \sum_{l=1}^L\beta_{l}\textrm{loc}_{il} + s(t) + \epsilon_{i} \]</span> 2. Geographically weighted regression models (GWR) plus non-parametric trend: these are models where the parameters change across the space. The effect in the price of a dwelling of including a garage, for instance, is not the same across space, and the model takes these into account. The general form of a GWR witt non-parametric trend is:</p>
+<p><span class="math display">\[ \log(\textrm{Precio/m2})_{it} = \sum_{i=1}^K\beta_jx(u_i,v_i)_{ij}  + s(t) + \epsilon_{i} \]</span> Here the location dummies have disappeared and the betas of the hedonic part are depenedent on the coordinates $u_i,v_i.</p>
+<p>Both types of models have a hedonic part for quality correction and a non-parametric tendency, from which the price index is derived. Although not imperative, it makes more sense to take prices in the log scale and per unit of surface (square foot or square meter) of the dwelling.</p>
+<p>We prepare the data computing the log price per unit of surface, an auxiliary time variable <code>x</code> (days elapsed from the date of the oldest observation in the sample) and filtering out observations for which no geographical information is available in coordinates <code>DX_ETRS89</code> and <code>DY_ETRS89</code>:</p>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">datos &lt;-<span class="st"> </span>venta.dep <span class="op">%&gt;%</span><span class="st"> </span>
 <span class="st">  </span><span class="kw">mutate</span>( <span class="dt">logpm2 =</span> <span class="kw">log</span>(IMP_CREACION <span class="op">/</span><span class="st"> </span>NUM_SUPERF),
           <span class="dt">x =</span> <span class="kw">as.integer</span>(FEC_CREACION <span class="op">-</span><span class="st"> </span><span class="kw">min</span>(FEC_CREACION)) ) <span class="op">%&gt;%</span>
 <span class="st">  </span><span class="kw">filter</span>( <span class="op">!</span><span class="kw">is.na</span>(DX_ETRS89) <span class="op">&amp;</span><span class="st"> </span><span class="op">!</span><span class="kw">is.na</span>(DY_ETRS89)) <span class="op">%&gt;%</span>
 <span class="st">  </span><span class="kw">as.data.frame</span>()</code></pre></div>
-<p>La variable <code>x</code> no es más que el número de días transcurrido desde la primera fecha disponible en la muestra. Se eliminan las observaciones que no están geolocalizadas, pues aunque las coordenadas no hacen falta en un modelo global, sí son necesarias en un modelo geográficamente ponderado (GWR).</p>
-<div id="modelos-globales" class="section level3">
-<h3>Modelos globales</h3>
-<p>Los modelos se estiman mediante la función <code>gam</code>. Por ejemplo,</p>
+<p>Geographical coordinates are not needed in a global model, but are required for a GWR model.</p>
+<div id="global-models" class="section level3">
+<h3>Global models</h3>
+<p>Global models are estimated using function <code>gam</code>. For instance,</p>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">mod1 &lt;-<span class="st"> </span><span class="kw">gam</span>( logpm2 <span class="op">~</span><span class="st">   </span>SUBREGION <span class="op">+</span><span class="st"> </span>ROOMNUMBER <span class="op">+</span><span class="st"> </span>HASLIFT <span class="op">+</span><span class="st"> </span>
 <span class="st">                </span>HASGARDEN <span class="op">+</span><span class="st"> </span>HASSWMMINGPOOL <span class="op">+</span><span class="st"> </span>HASTERRACE <span class="op">+</span><span class="st"> </span>
 <span class="st">                </span>IND_GARAJE  <span class="op">+</span><span class="st"> </span><span class="kw">s</span>(x,<span class="dt">bs=</span><span class="st">&quot;cr&quot;</span>, <span class="dt">k=</span><span class="dv">16</span>), 
               <span class="dt">data=</span>datos)</code></pre></div>
-<p>Es decisión del analista cuántas y cuáles variables incluir; deseamos, evidentemente, un modelo tan descriptivo como sea posible y que incorpore el máximo de variables capaces de describir la calidad de cada inmueble. No obstante, la presencia de valores perdidos hace que un modelo muy ambicioso haya de prescindir de gran parte de la muestra (porque hay variables muy poco observadas). El parámetro <code>k</code> es el número de grados de libertad equivalentes: <code>s(x, bs=&quot;cr&quot;, k=16)</code> es un <strong>spline</strong> cúbico con esos grados de libertad. Uno o dos grados de libertad por año es por lo general suficiente y proporciona más que suficiente flexibilidad en el ajuste.</p>
-<p>Podemos inspeccionar el resultado mediante</p>
+<p>It is up to the analyst to decide which variables to include. Clearly, we want a model as descriptive as posible, incorporating each variable which conceivably is descriptive of the quality of the dwellings; however, too ambitious a model will force to discard many observations for which the included variables are not observed. The <code>k</code> parameter is the equivalent number of degrees of freedom (EDF): we have found one or two per year to be plenty. <code>s(x, bs=&quot;cr&quot;, k=16)</code> is a cubic <strong>spline</strong> with the prescribed degrees of freedom.</p>
+<p>Results can be inspected by:</p>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">summary</span>(mod1)</code></pre></div>
 <pre><code>## 
 ## Family: gaussian 
@@ -257,7 +258,7 @@ code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Inf
 ## s(x) 14.15  14.82 858.5  &lt;2e-16</code></pre>
 <div id="consind" class="section level4">
 <h4>ConsInd</h4>
-<p>El objeto devuelto por <code>gam</code> es cuanto necesitamos para calcular el índice, haciendo uso de la función <code>ConsInd</code>:</p>
+<p>The object returned by <code>gam</code> is all we need to compute the index, using function <code>ConsInd</code>:</p>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">ind &lt;-<span class="st"> </span><span class="kw">ConsInd</span>(<span class="dt">modelo=</span>mod1, <span class="dt">base=</span><span class="st">&quot;2007-12-31&quot;</span>, 
         <span class="dt">tit=</span><span class="st">&quot;Índice precio vivienda CAPV.</span><span class="ch">\n</span><span class="st">Ef. espacial: SUBREGION&quot;</span>,
         <span class="dt">fechas=</span><span class="kw">as.Date</span>(datos<span class="op">$</span>FEC_CREACION),
