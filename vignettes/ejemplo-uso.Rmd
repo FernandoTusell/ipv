@@ -52,20 +52,25 @@ library(zoo)
 ## Model estimation
 
 
-The package targets two types of models for housing price indices estimation:
+The package targets two types of models for housing prices index estimation:
 
 1. Global models plus non-parametric tendency: these are models where parameters of the hedonic part are common to the whole area of estimation.
 Location does matter in prices, but it enters the model via a proxy like `SUBREGION`, `AF` (functional area), etc.
 The general form of a global model would be:
+$$ \log(\textrm{Precio/m2})_{it} = \sum_{j=1}^K\beta_jx_{ij} + \sum_{l=1}^L\beta_{l}\textrm{loc}_{il} + s(t) + \epsilon_{i} $$
+$\textrm{loc}_{il}$ is a dummy which takes value 1 if observation 
+$i$ belongs to region $l$, cero otherwise; $\beta_l$ measures the impact 
+on the response of the fact that the dwelling  
+is in region $l$, and $s(t)$ is a non-parametric function of time global 
+to all regions, from which the index computed. 
 
-$$ \log(\textrm{Precio/m2})_{it} = \sum_{i=1}^K\beta_jx_{ij} + \sum_{l=1}^L\beta_{l}\textrm{loc}_{il} + s(t) + \epsilon_{i} $$
 2. Geographically weighted regression models (GWR) plus non-parametric trend: 
 these are models where the parameters change across the space.
 The effect in the price of a dwelling of including a garage, for instance, is not the same across space, and the model takes these into account. The general form of a GWR witt non-parametric trend is:
-
-$$ \log(\textrm{Precio/m2})_{it} = \sum_{i=1}^K\beta_jx(u_i,v_i)_{ij}  + s(t) + \epsilon_{i} $$
-Here the location dummies have disappeared and the betas of the hedonic part are depenedent on the coordinates
-$u_i,v_i.
+$$ \log(\textrm{Precio/m2})_{it} = \sum_{j=1}^K\beta_j(u_i,v_i)x_{ij}  + s(t) + \epsilon_{i} $$
+Here the location dummies have disappeared and the betas of the hedonic part are dependent on the coordinates
+$u_i,v_i$. The lcoation dummies are no longer present, as the space effect is taken up via the dependence of 
+the betas on coordinates $(u_i,v_i)$.
 
 Both types of models have a hedonic part for quality correction and a non-parametric tendency, from which the price index is derived. Although not imperative, it makes more sense to take prices in the log scale and per unit of surface (square foot or square meter) of the dwelling.
 
@@ -297,18 +302,41 @@ mggplot <- function(x, columnas=names(x),
     theme(legend.position=leyenda[1])
   return(p)
 }
+```
 
+```{r}
 names(lista.ind[[2]]) <- rownames(lista.ind[[1]])
 p <-mggplot(lista.ind[[2]], columnas=rownames(lista.ind[[1]]), tipo="multiple")
 p <- p + ggtitle("Local indices",
               sub=paste("Base: ","31-12-2010"," = 100"))
-pdf(file="localindices.pdf")
+# pdf(file="localindices.pdf")
 print(p)
-scratch <- dev.off()
+# scratch <- dev.off()
 ```
 
 
 ### Local indices via time slicing
 
+Am alternative way to the computation of local indices would be time slicing. Using this approach, 
+for each location we would do the following:
+
+1. Set the calibration point (location for which the index is sought).
+1. Slice observations according to time. The time intervals need be such that enough observations are
+left in each slice to allow the fitting of GWR model.
+1. With observations in each slice, fit the GWR model at the selected location. 
+$$ \log(\textrm{Precio/m2})_{it} = \sum_{j=1}^K\beta_j(u_i,v_i,t)x_{ij}  + \epsilon_{i} $$
+This gives a set of 
+$\beta(u,v,t)$, where $t$ corresponds to the time slice.
+1. With a set of such indices, we can estimate the price at time $t$ 
+of a dwelling of given attributes $x_j$ by 
+$$\sum_{j=1}^K\beta_j(u_i,v_i,t)x_{j}.$$
+Such dwelling would have cost at the base time $t=0$
+$$\sum_{j=1}^K\beta_j(u_i,v_i,0)x_{j};$$
+hence an estimate of the price index $I_0(t)$ at time $t$ with base period $t=0$ can be constructed as
+$$I_0(t) = \frac{\exp{\left(\sum_{j=1}^K\beta_j(u_i,v_i,t)x_{j}\right)}}{\exp{\left(\sum_{j=1}^K\beta_j(u_i,v_i,0)x_{j}\right)}}$$
+This is just a Laspeyres type of index in which the shadow prices of the attributes 
+(the $\beta_j(u_i,v_i,t)$) are given weights equal to their "presence" $x_j$ in a
+virtual homogeneous dwelling, which is taken as representative of the area
+(but need not have been observed at all times, nor even at a single time!).
 
 
