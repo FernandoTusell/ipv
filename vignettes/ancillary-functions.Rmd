@@ -9,6 +9,7 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(cache=TRUE, fig.width=7, fig.height=5.5)
 options(width=120)
@@ -31,14 +32,16 @@ the use of functions.)
 
 ## Ancillary functions
 
-El paquete contiene algunas funciones auxiliares que no se prevee sean invocadas directamente por el usuario (`pols` y `CompFechas`) y una función (`cloromap`) que permite representar una variable sobre el mapa
-de la CAPV o partes de él.
+The package contains some ancillary functions which are not meant to be called directly by the user(`pols` and
+`CompFechas`) and one (`cloromap`) which affords easy representation of a variable onto the map of the CAPV (Autonomous Community of the Basque Country) or parts of it.
+
 
 ### cloromap
 
 Tomemos las observaciones de inmuebles a la venta y contabilicemos el número de 
 ellas que existen por cada área funcional (codificada en la variable `AF`):
-Para
+Let+s take the observations corresponding to houses for sale and count the number
+in each "functional are"  (coded in variable `AF`):
 
 ```{r}
 Obs <- venta.dep %>%
@@ -47,15 +50,15 @@ Obs <- venta.dep %>%
   as.data.frame()
 ```
 
-La dataframe `Obs` tiene esta estructura:
+The  `Obs` data frame has the following structure:
 
 ```{r}
 head(Obs)
 ```
 
-Para cartografiarla, necesitamos una dataframe espacial  (spframe) con polígonos
-para las entidades espaciales sobre las que se agrega (aquí, áreas funcionales).
-Podemos obtener dichos contornos así:
+In order to represent these numbers on a map, we need an spatial dataframe
+ (spframe) with polygons for the spatial entities concerned (here, functional areas, as
+ defined in `AF`). We can obtain these polygons as follows:
 
 ```{r}
 dsn <- system.file("extdata/CB_AREAS_FUNCIONALES_5000_ETRS89.shp", 
@@ -63,8 +66,7 @@ dsn <- system.file("extdata/CB_AREAS_FUNCIONALES_5000_ETRS89.shp",
 af  <- readOGR(dsn)
 ```
 
-Comprobamos la correspondencia de las areas funcionales de la cartografía y las del fichero de idealista completado:
-
+We have to check that the number and correspondence of areas in `Obs` and in `af` is consistent:
 
 ```{r}
 af@data
@@ -73,13 +75,14 @@ cbind(levels(af@data$A_FUNC_CAS),
       levels(sort(unique(Obs$AF))))
 ```
 
-
-La correspondencia es total: renombramos los niveles de `venta.dep`
-con los nombres en `af`.
+There is one-to-one correspondence. We rename the levels in  `venta.dep`
+with the names in `af`.
 
 ```{r}
 levels(Obs$AF) <- levels(af@data$A_FUNC_CAS)
 ```
+
+Now we can invoke:
 
 
 ```{r}

@@ -472,126 +472,64 @@ ConsInd <- function(modelo=NULL,base="2008-02-01",
   return( invisible(CompFechas(indice=ICV[,1], fechas=x)) )
 }
 
+#' Fusion
 #'
-#' #' Fusion
-#' #'
-#' #' Merge two dataframes using  \code{varX} and \code{varY} as keys. Since they may not be exactly alike,
-#' #' \code{canon} contains a dataframe which enables translation of either key
-#' #' to a canonical form after (optionally) transliterating to a common character encoding.
-#' #'
-#' #' @param X First dataframe to merge
-#' #' @param Y Second dataframe to merge
-#' #' @param varX Variable acting as key in X
-#' #' @param varY Variable acting as key in Y
-#' #' @param locX Column in \code{canon} against which to match values of column \code{varX} in \code{X}
-#' #' @param locY Column in \code{canon} against which to match values of column \code{varY} in \code{Y}
-#' #' @param locCanon Column in \code{canon} holding the canonical names. Defaults to column named 'Canon' if one exists and the argument is not set on call.
-#' #' @param canon Correspondence between varX, varY and canonical value of the key (defaults to column 'Canon').
-#' #' @param transX Transformation to be applied to varX (if any)
-#' #' @param transY Transformation to be applied to varY (if any)
-#' #'
-#' #' @return Data frame or merge of two data frames, with location names replaced by canonical names.
-#' #' @export
-#' #'
-#' #' @examples
-#' #' X     <- data.frame(a=c("Bilbao","San Sebastian","Vitoria","Teruel"),
-#' #'                     b=c("A","B","B","D"), d=c(TRUE,TRUE,FALSE,TRUE))
-#' #' X
-#' #' Y     <- data.frame(e=c("Bilbao","Donostia","Vitoria/Gazteiz","Soria"),
-#' #'                     g=c("F","G","H","J"), h=c(TRUE,FALSE,TRUE,TRUE))
-#' #' Y
-#' #' canon <- data.frame(X=c("Bilbao","San Sebastian","Vitoria"),
-#' #'                     Y=c("Bilbao","Donostia","Vitoria/Gazteiz"),
-#' #'                     Canon=c("Bilbao","Donostia","Vitoria"))
-#' #' canon
-#' #'
-#' #' Fusion(X, varX="a", locX=1, locCanon=3, canon=canon)
-#' #'
-#' #' Fusion(X=Y, varX="e", locX=2, locCanon=3, canon=canon)
-#' #'
-#' #' Fusion(X,Y,varX="a",varY="e",locX=1, locY=2, canon=canon)
-#' #'
-#' #' canon <- data.frame(X=c("Bilbao","San Sebastian","Vitoria","Teruel","Soria"),
-#' #'                     Y=c("Bilbao","Donostia","Vitoria/Gazteiz", "Teruel","Soria"),
-#' #'                     Canon=c("Bilbao","Donostia","Vitoria","Teruel","Soria"))
-#' #'
-#' #' Fusion(X, varX="a", locX=1, locCanon=3, canon=canon)
-#' #'
-#' #' Fusion(X=Y, varX="e", locX=2, locCanon=3, canon=canon)
-#' #'
-#' #' Fusion(X,Y,varX="a",varY="e",locX=1, locY=2, canon=canon)
-#' #'
-#' #' canon <- data.frame(X=c("Bilbao","San Sebastian","Vitoria","Teruel","Soria"),
-#' #'                     Y=c("Bilbao","Donostia","Vitoria/Gazteiz", "Teruel","Soria"),
-#' #'                     Canon=c("CAPV","CAPV","CAPV","NoCAPV","NoCAPV"))
-#' #'
-#' #' Fusion(X, varX="a", locX=1, locCanon=3, canon=canon)
-#' #'
-#' #' Fusion(X=Y, varX="e", locX=2, locCanon=3, canon=canon)
-#' #'
-#' #' # This hardly makes sense:
-#' #'
-#' #' Fusion(X, Y, varX="a", varY="e", locX=1, locY=2, locCanon=3, canon=canon)
-#' #'
-#' Fusion <- function(X,
-#'                    Y=NULL,
-#'                    varX, locX=1,
-#'                    varY, locY=2,
-#'                    canon, locCanon=NULL,
-#'                    transX = NULL,
-#'                    transY = NULL)
-#' {
-#'   #
-#'   #  Use default, if canonical column has not been specified
-#'   #
-#'   if (is.null(locCanon))
-#'     locCanon=match("Canon",colnames(canon))
-#'   #
-#'   #  Transliterate as needed
-#'   #
-#'   if (!is.null(transX))
-#'     X[, varX] <-
-#'     iconv(x = X[, varX], from = transX, to = "utf8")
-#'   if (!is.null(transY))
-#'     Y[, varY] <-
-#'     iconv(x = Y[, varY], from = transY, to = "utf8")
-#'   #
-#'   #  Match key varX and replace by canonical values
-#'   #
-#'   tmp <- match(X[, varX], canon[, locX])
-#'   if (any(is.na(tmp))) {
-#'     cat("\nThe following values of varX could not be matched:\n")
-#'     cat(as.character(X[is.na(tmp),varX]),"\n")
-#'   }
-#'   tX <- ifelse(!is.na(tmp), canon[tmp, locCanon], NA)
-#'   if (is.factor(canon[tmp, locCanon]))
-#'     X[, varX] <- factor(levels(canon[tmp, locCanon])[tX])
-#'   #
-#'   #  Do likewise for key varY, if second argument is given
-#'   #
-#'   if (!is.null(Y)) {
-#'   tmp <- match(Y[, varY], canon[, locY])
-#'   if (any(is.na(tmp))) {
-#'     cat("\nThe following values of varY could not be matched:\n")
-#'     cat(as.character(Y[is.na(tmp),varY],"\n"))
-#'   }
-#'   tY <- ifelse(!is.na(tmp), canon[tmp, locCanon], NA)
-#'   if (is.factor(canon[tmp, locCanon]))
-#'     Y[, varY] <- factor(levels(canon[tmp, locCanon])[tY])
-#'   }
-#'   #
-#'   #  If two data frames 'x' and 'y' were passed, merge them to return,
-#'   #  else return the first with the key replaced by canonical names
-#'   #
-#'   if (!is.null(Y))
-#'     tmp <- merge(x=X, y=Y, by.x=varX, by.y=varY, all=TRUE)
-#'   else
-#'     tmp <- X
-#'   #
-#'   return(tmp[!is.na(tmp[,varX]),])
-#' }
-
-
+#' @param X  Second dataframe to merge
+#' @param Y  Second dataframe to merge
+#'
+#' @param varX Variable acting as key in X
+#' @param locX Column in \code{canon} against which to match values of column \code{varX} in \code{X}
+#' @param varY Variable acting as key in Y
+#' @param locY Column in \code{canon} against which to match values of column \code{varY} in \code{Y}
+#' @param canon Correspondence between varX, varY and canonical value of the key (defaults to column 'Canon').
+#' @param locCanon Column in \code{canon} holding the canonical names. Defaults to column named 'Canon' if one exists and the argument is not set on call.
+#' @param transX Transformation to be applied to varX (if any)
+#' @param X
+#' @param transY Transformation to be applied to varY (if any)
+#'
+#' @return Data frame or merge of two data frames, with location names replaced by canonical names.
+#' @export
+#'
+#' @examples
+#' X     <- data.frame(a=c("Bilbao","San Sebastian","Vitoria","Teruel"),
+#'                     b=c("A","B","B","D"), d=c(TRUE,TRUE,FALSE,TRUE))
+#' X
+#' Y     <- data.frame(e=c("Bilbao","Donostia","Vitoria/Gazteiz","Soria"),
+#'                     g=c("F","G","H","J"), h=c(TRUE,FALSE,TRUE,TRUE))
+#' Y
+#' canon <- data.frame(X=c("Bilbao","San Sebastian","Vitoria"),
+#'                     Y=c("Bilbao","Donostia","Vitoria/Gazteiz"),
+#'                     Canon=c("Bilbao","Donostia","Vitoria"))
+#' canon
+#'
+#' Fusion(X, varX="a", locX=1, locCanon=3, canon=canon)
+#'
+#' Fusion(X=Y, varX="e", locX=2, locCanon=3, canon=canon)
+#'
+#' Fusion(X,Y,varX="a",varY="e",locX=1, locY=2, canon=canon)
+#'
+#' canon <- data.frame(X=c("Bilbao","San Sebastian","Vitoria","Teruel","Soria"),
+#'                     Y=c("Bilbao","Donostia","Vitoria/Gazteiz", "Teruel","Soria"),
+#'                     Canon=c("Bilbao","Donostia","Vitoria","Teruel","Soria"))
+#'
+#' Fusion(X, varX="a", locX=1, locCanon=3, canon=canon)
+#'
+#' Fusion(X=Y, varX="e", locX=2, locCanon=3, canon=canon)
+#'
+#' Fusion(X,Y,varX="a",varY="e",locX=1, locY=2, canon=canon)
+#'
+#' canon <- data.frame(X=c("Bilbao","San Sebastian","Vitoria","Teruel","Soria"),
+#'                     Y=c("Bilbao","Donostia","Vitoria/Gazteiz", "Teruel","Soria"),
+#'                     Canon=c("CAPV","CAPV","CAPV","NoCAPV","NoCAPV"))
+#'
+#' Fusion(X, varX="a", locX=1, locCanon=3, canon=canon)
+#'
+#' Fusion(X=Y, varX="e", locX=2, locCanon=3, canon=canon)
+#'
+#' # This hardly makes sense:
+#'
+#' Fusion(X, Y, varX="a", varY="e", locX=1, locY=2, locCanon=3, canon=canon)
+#'
 Fusion <- function(X,
                    Y=NULL,
                    varX, locX=1,

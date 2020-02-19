@@ -9,7 +9,7 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
-```{r setup, include=FALSE}
+```{r setup, include=TRUE}
 knitr::opts_chunk$set(cache=TRUE, fig.width=7, fig.height=5.5)
 options(width=120)
 ```
@@ -124,8 +124,8 @@ ind <- ConsInd(modelo=mod1, base="2007-12-31",
         plot=TRUE)
 ```
 
-Obsérvese que aunque el resultado deseado en general es la gráfica, `ConsInd` retorna también de modo invisible el índice, en forma de serie temporal fechada
-diariamente:
+Even though the desired result will most often be the graph,  `ConsInd` returns also (invisibly)
+the index, as a time series with daily dates.
 
 ```{r}
 class(ind)
@@ -140,7 +140,11 @@ simplifica el trabajo: en lugar de una invocación a `ConsInd` para cada
 sóla invocación a `IndZonas` dando una variable `zonas` cuyos niveles 
 especificaran cada uno de los ámbitos para los que se calcula un índice.
 
-Así por ejemplo, si queremos un índice para cada provincia,
+We might want to compute indeices for diferent zones. Function `IndZonas` is meant to simplify 
+the task: rather than a separate invocation to `ConsInd` for each zone, we can make a single
+invocation to `IndZonas` passing an argument `zonas` whose levels define the different zones.
+
+Hence, if we want a separate index for each province,
 
 ```{r}
 ind.prov <- IndZonas(datos, zonas="PROVINCIA", frm=formula(mod1))
@@ -150,6 +154,10 @@ No es preciso que proporcionemos toda la información obtenida al estimar
 el modelo `mod1`: basta con la fórmula, que podemos extraer de `mod1` o 
 directamente teclear. Una invocación equivalente a la anterior, sería:
 
+We have taken the model specification formn `mod1`; we could type it directly.
+The following invocation would be functionally equivalente to the previous
+one:
+
 ```{r}
 ind.prov <- IndZonas(datos, zonas="PROVINCIA", 
                      frm=formula( logpm2 ~ SUBREGION + ROOMNUMBER + 
@@ -158,13 +166,14 @@ ind.prov <- IndZonas(datos, zonas="PROVINCIA",
                                     s(x,bs="cr", k=16) ))
 ```
 
-El resultado en `ind.prov` es *una lista* de índices que podemos representar en sendos paneles con los nombres que deseemos. 
+The result in  `ind.prov` is *a list* of indices which can be represente in separate panels.
+
 
 #### mggplot
 
-A continuación se toman esos nombres
-de los que tienen los elementos de `ind.prov` y se invoca la función `mggplot`
-para hacer todas las gráficas de una vez:
+Plotting several indices is facilitated by using the function `mggplot`, which takes the object 
+returned by `IndZones` and constructs the plot. Below we obtain the names of the plots from 
+the names in the list `ind.prov`, but we could supply different names in the argument `columnas`.
 
 
 ```{r}
@@ -173,25 +182,24 @@ prov
 mggplot(ind.prov, columnas=prov)   
 ```
 
-Podemos optar por representar todas las gráficas superpuestas en un único
-panel:
+We might opt for plotting all indices in a single scale:
 
 ```{r}
 mggplot(ind.prov, columnas=prov, tipo="multiple")   
 ```
 
 
-### Modelos geográficamente ponderados
+### Geographically weighted models
 
 
+The dataframes `venta.dep` and `alquiler.dep` include UTM projected coordinates
+(`DX_ETRS89`, `DY_ETRS89` and
+corresponding `DX_ED50` and `DY_ED50`) We can set directly a desired *bandwidth* or select it
+by cross-validation, which with objects the size of the ones we have here would be quite expensive.
+We will set a bandwidth of 5000m; this is the radius of the circles around each point which receive substantial weight
+in the local fitting procedure.
 
-Las coordenadas que ha añadido EUSTAT (`DX_ETRS89`, `DY_ETRS89` y
-correspondientes `DX_ED50` y `DY_ED50`) parecen ya proyectadas en
-metros. Podemos emplearlas fijando un *bandwidth* directamente o
-obtenerlo mediante validación cruzada (muy costoso);
-fijaremos un bandwidth de 5000m. Se trata del radio de las regiones en que se llevan a cabo los ajustes locales.
-
-Hemos de crear una dataframe espacial con las variables que nos interesan:
+Lets create an spatial data frame with the variables we need:
 
 ```{r, CreacionSpatialDataFrame}
 spdatos <- datos[,c("logpm2","SUBREGION","ROOMNUMBER","HASLIFT",
@@ -202,17 +210,15 @@ coordinates(spdatos) <- ~ DX_ETRS89 + DY_ETRS89
 ```
 
 
-El algoritmo de *backfitting*  alterna los ajustes espacial y no paramétrico hasta convergencia. **A efectos puramente ilustativos, y dado que el cálculo completo es
-tan costoso de efectuar, se selecciona aquí una submuestra para que el tiempo
-de computación no sea excesivo.** El índice con la muestra completa varia apreciablemente.
+The *backfitting* algorithm alternates the spatial and time adjustments until convergence. **For ilustration only a subsample is selected here, to reduce computation time. Results with the whole sample chage considerably.** 
 
 ```{r, BackFitting-Global}
 frm         <- formula(mod1)
 frm.param   <- update(frm, ~ . - s(x,bs="cr",k=16))
 smooth.term <- 's(x,bs="cr",k=16)'
 
-sel <- ((1:nrow(datos)) %% 5) == 0                        # Una observación de cada 5
-sel <- sel & datos$FEC_CREACION > as.Date("2006-12-31")   # Sólo donde hay datos suficientes
+sel <- ((1:nrow(datos)) %% 5) == 0                        # One observation out of each 5
+sel <- sel & datos$FEC_CREACION > as.Date("2006-12-31")   # Only after this date there is enough data
 
 indice <- BackFitting(frm.param=frm.param,
             smooth.term=smooth.term,
@@ -223,7 +229,7 @@ indice <- BackFitting(frm.param=frm.param,
             baseday='2008-01-01')
 ```
 
-El resultado es,
+The result is
 
 ```{r}
 plot(indice)
@@ -339,4 +345,20 @@ This is just a Laspeyres type of index in which the shadow prices of the attribu
 virtual homogeneous dwelling, which is taken as representative of the area
 (but need not have been observed at all times, nor even at a single time!).
 
+
+```{r}
+library(zoo)
+datos$FEC_CREACION <- as.yearmon(datos$FEC_CREACION)
+#  Selecccionar datos correspondientes a una zona pequeña, como en el chunk
+#  BackFittingLocal
+for (i in unique(datos$FEC_CREACION)) {
+  # Ajustar un modelo espacial a cada mes, guardando los resultados
+  # en una lista
+}
+#  Evaluar el precio de una vivienda standard e.g. 90m2, 3 habitaciones,
+#  ascensor, sin garaje cada periodo.
+
+#  Calcular el índice como se indica en el texto
+
+```
 

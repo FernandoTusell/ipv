@@ -18,7 +18,7 @@ Fusion(
 )
 }
 \arguments{
-\item{X}{First dataframe to merge}
+\item{X}{Second dataframe to merge}
 
 \item{Y}{Second dataframe to merge}
 
@@ -42,9 +42,7 @@ Fusion(
 Data frame or merge of two data frames, with location names replaced by canonical names.
 }
 \description{
-Merge two dataframes using  \code{varX} and \code{varY} as keys. Since they may not be exactly alike,
-\code{canon} contains a dataframe which enables translation of either key
-to a canonical form after (optionally) transliterating to a common character encoding.
+Fusion
 }
 \examples{
 X     <- data.frame(a=c("Bilbao","San Sebastian","Vitoria","Teruel"),
