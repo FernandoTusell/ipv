@@ -199,12 +199,13 @@ by cross-validation, which with objects the size of the ones we have here would 
 We will set a bandwidth of 5000m; this is the radius of the circles around each point which receive substantial weight
 in the local fitting procedure.
 
-Lets create an spatial data frame with the variables we need:
+Lets create an spatial data frame with the variables we will need:
 
 ```{r, CreacionSpatialDataFrame}
+datos$HASLIFT <- as.factor(datos$HASLIFT)
 spdatos <- datos[,c("logpm2","SUBREGION","ROOMNUMBER","HASLIFT",
                     "HASGARDEN","HASSWMMINGPOOL","HASTERRACE",
-                    "IND_GARAJE","DX_ETRS89","DY_ETRS89")]
+                    "IND_GARAJE","DX_ETRS89","DY_ETRS89","FEC_CREACION")]
 spdatos <- spdatos[complete.cases(spdatos),]
 coordinates(spdatos) <- ~ DX_ETRS89 + DY_ETRS89
 ```
@@ -286,29 +287,6 @@ lista.ind <- BackFittingLocal(frm.param=frm.param,
                         plotind=FALSE)
 ```
 
-```{r}
-mggplot <- function(x, columnas=names(x),
-                    tipo=c("panel","multiple"),
-                    leyenda=c("bottom","right")) {
-  if ( is.list(x))
-    x <- do.call("merge", x[columnas])
-  fecha <- index(x)
-  tmp   <- cbind(fecha, as.data.frame(x))
-  tmp   <- tmp %>% gather(Location,indice,-fecha)
-  if (tipo[1]=="panel")
-    p <- ggplot(tmp) +
-    geom_line(aes(x=fecha, y=indice, colour=Location)) +
-    xlab("Date") + ylab("Index") +
-    facet_wrap(~ Location) +
-    theme(legend.position=leyenda[1])
-  else if (tipo[1]=="multiple")
-    p <- ggplot(tmp) +
-    geom_line(aes(x=fecha, y=indice, colour=Location)) +
-    xlab("Date") + ylab("Index") +
-    theme(legend.position=leyenda[1])
-  return(p)
-}
-```
 
 ```{r}
 names(lista.ind[[2]]) <- rownames(lista.ind[[1]])
@@ -345,20 +323,108 @@ This is just a Laspeyres type of index in which the shadow prices of the attribu
 virtual homogeneous dwelling, which is taken as representative of the area
 (but need not have been observed at all times, nor even at a single time!).
 
+We select data in the Bilbao area, from 2012 onwards (observations before 
+are scarce)
 
 ```{r}
-library(zoo)
-datos$FEC_CREACION <- as.yearmon(datos$FEC_CREACION)
-#  Selecccionar datos correspondientes a una zona pequeña, como en el chunk
-#  BackFittingLocal
-for (i in unique(datos$FEC_CREACION)) {
-  # Ajustar un modelo espacial a cada mes, guardando los resultados
-  # en una lista
-}
-#  Evaluar el precio de una vivienda standard e.g. 90m2, 3 habitaciones,
-#  ascensor, sin garaje cada periodo.
-
-#  Calcular el índice como se indica en el texto
-
+knitr::knit_exit()
+SlicedIndex <-
+  function(cal.pts,
+           spdatos = NULL,
+           from = NULL,
+           to = NULL,
+           base = NULL,
+           frm = NULL,
+           vars = NULL,
+           bw = 1000,
+           area.radius = 5 * bw,
+           date = NULL,
+           slice.by = NULL)
+  {
+    require(zoo)
+    if (is.null(date))
+      stop("'date' not specified with no default.")
+    if (is.null(slice.by))
+      stop("'slice.by' not specified with no default.")
+    #
+    # Convert observations to selected time interval
+    #
+    spdatos@data[, date] <- sapply(spdatos@data[, date], FUN = slice.by)
+    spdatos <- spdatos[(spdatos@data[, date] >= from) &
+                         (spdatos@data[, date] <= to), ]
+    #
+    # Pick only required variables, and cases complete for such variables
+    #
+    spdatos <- spdatos[complete.cases(spdatos@data), ]
+    slices  <- sort(unique(spdatos@data[, date]))
+    #
+    # For each calibration point, take a subset of observations within
+    # area.radius distance (projected coordinates are assumed)
+    #
+    xy      <- coordinates(cal.pts)
+    preds   <- as.data.frame(matrix(0, length(slices), nrow(cal.pts)))
+    colnames(preds) <- rownames(cal.pts)
+    preds   <- zoo(preds, order.by = slices)
+    
+    for (i in nrow(cal.pts)) {
+      sel <- rep(FALSE, nrow(spdatos@data))
+      sel <- sel | (colSums((t(coordinates(spdatos)) - xy[i, ]) ^ 2) <
+                      area.radius ^ 2)
+      for (j in seq_along(slices)) {
+        subsel <- sel & (spdatos@data[, date] == slices[j])
+        cat("Processing slice:  ", as.character(slices[j]), "\n")
+        cat(sum(subsel), "\n")
+        preds[j, ] <- gwr(
+          formula = frm,
+          bandwidth = bw,
+          data = spdatos[subsel, ],
+          fit.points = cal.pts,
+          predict = TRUE
+        )$SDF@data$"(Intercept)"
+      }
+    }
+    return(preds)
+  }
 ```
 
+
+
+The points for which we want predictions must be in the form of a data frame
+with complete values of the variables used in the model. The easiest way to
+construct values for the argument `fit.points` below is to take arbitrary rows
+of `spdatos` (one for calibration point), replace the values of the variables
+for the ones we want, and the set the coordinates conveniently. We use as a
+"median house" for this area a flat with three bedrooms, garage space and
+elevator, but no garden, swimming pool or terrace ---the first two attributes
+being non-existent in the area---.
+
+```{r}
+median.houses <- spdatos@data[1:2,]
+median.houses$ROOMNUMBER <- 3
+median.houses$HASLIFT <- factor("SI", levels=levels(spdatos@data$HASLIFT))
+median.houses
+```
+
+Now we set the coordinates:
+
+```{r}
+coordinates(median.houses) <- cal.pts
+```
+
+We will fit a model to each slice of time, and obtain predictions of the prices for the median houses:
+
+
+
+```{r}
+preds <- SlicedIndex(
+    cal.pts = median.houses,
+    spdatos = spdatos,
+    from = as.yearqtr("2016 Q1"),
+    to = as.yearqtr("2019 Q1"),
+    bw = 1000,
+    frm = formula(logpm2 ~ ROOMNUMBER + 
+                    HASLIFT + IND_GARAJE),
+    date = "FEC_CREACION",
+    slice.by=as.yearqtr)
+plot(exp(preds))
+```
