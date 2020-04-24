@@ -16,6 +16,7 @@
 #' @param cores Número de cores que se desea emplear. Si no se indica nada, todos los de la máquina.
 #' @param tol Máxima discrepancia relativa entre los valores de dos splines en iteraciones sucesivas para continuar la iteración.
 #' @param plotind Variable lógica: TRUE si se desea la impresión del índice resultante.
+#' @param gwrmod Variable lógica, TRUE si queremos los resultados del ajuste espacial
 #'
 #' @return Un índice de precios, con base en el día especificado, en formato de serie temporal \code{zoo.}
 #' @export
@@ -33,7 +34,8 @@ BackFitting <- function(frm.param,
                        bw=5000,
                        cores,
                        tol=0.001,
-                       plotind=FALSE) {
+                       plotind=FALSE,
+                       gwrmod=FALSE) {
     require(mgcv)
     require(spgwr)
     require(parallel)
@@ -106,7 +108,7 @@ BackFitting <- function(frm.param,
     newind <- indice0 ; lastind <- 0 * newind ; iter <-0
     #
     #  Mientras la máxima discrepancia entre dos índices
-    #  sucesivos sea pequeña, continúav
+    #  sucesivos sea pequeña, continúa
     #
     while( max(abs(newind-lastind)) > tol * max(abs(newind)) ) {
       iter <- iter + 1
@@ -152,7 +154,11 @@ BackFitting <- function(frm.param,
             base = baseday,
             plot=plotind,
             x.base=x.base)
+    if (gwrmod) {
+      return(list(ind=newind,gwrmod=mod.gwr ))
+    } else {
     return(newind)
+      }
   }
 
 
@@ -703,17 +709,16 @@ pols <- function(base, sub.var=NULL, sub.set=NULL,
 
 #' SlicedIndex
 #'
-#' @param cal.pts
-#' @param spdatos
-#' @param from
-#' @param to
-#' @param base
-#' @param frm
-#' @param vars
-#' @param bw
-#' @param area.radius
-#' @param date
-#' @param slice.by
+#' @param cal.pts Points at which the index is to be computed. It has the form of a spatial object, containing in the @data slot all required variables in formula `frm`  with values typically set for a "median house", a type of dwelling characteristic around the calibration point. It also needs to contain a date variable to create the time slices.
+#' @param spdatos Spatial data frame containing data and the `date` variable
+#' @param from Starting point in time for index computation.
+#' @param to End point in time for index computation.
+#' @param base Base ( = 100) period for index computation.
+#' @param frm Formula to be used in GWR. All variables must be present in the @data slot of `spdatos`.
+#' @param bw  Bandwidth to be used in GWR.
+#' @param area.radius Area to subselect data. Usefull when we want a local index and wnat to discard observations which are hardly relevant. By default, five times the selected GWR bandwidth.
+#' @param date  Variable in the @data slot of `spdatos` which gives the date of each observation.
+#' @param slice.by  Function to be applied to `date` in otrder to obtain the time slices. It must produce a time value of the same type as `to` and  `from`.
 #'
 #' @return
 #' @export
@@ -726,7 +731,6 @@ SlicedIndex <-
            to = NULL,
            base = NULL,
            frm = NULL,
-           vars = NULL,
            bw = 1000,
            area.radius = 5 * bw,
            date = NULL,

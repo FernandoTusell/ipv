@@ -14,6 +14,14 @@ knitr::opts_chunk$set(cache=TRUE, fig.width=7, fig.height=5.5)
 options(width=120)
 ```
 
+```{r u107432}
+Sys.setenv(MKL_NUM_THREADS="8")
+Sys.setenv(MKL_DYNAMIC="TRUE")
+Sys.setenv(OMP_NUM_THREADS=4)
+cores=4
+```
+
+
 
 In the process of constructing a housing price index for the Basque Autonomous Community (CAPV) and certain of its subareas using real estate data from web sources (mainly idealista.com), it has been necessary to write a number of functions, which are now collected in package `ipv`.
 
@@ -25,6 +33,11 @@ These are spur-of-the-moment functions, which are usable and in fact have suppor
 The data have been collected in two `.rda` files,  `venta.dep.rda` and `alquiler.dep.rda`.
 We have cleanned the raw data as made available to us by removing anomalous or repeated observations, etc. The files reside in the `data` folder of the package and can be loaded
 by typing:
+
+
+```{r}
+comienzo <- Sys.time()
+```
 
 
 ```{r}
@@ -226,6 +239,7 @@ indice <- BackFitting(frm.param=frm.param,
             var.loc="SUBREGION",
             coords=c("DX_ETRS89","DY_ETRS89"),
             datos=datos[sel,],
+            cores=cores,
             var.fecha='FEC_CREACION',
             baseday='2008-01-01')
 ```
@@ -281,6 +295,7 @@ lista.ind <- BackFittingLocal(frm.param=frm.param,
                         var.fecha='FEC_CREACION',
                         var.loc='SUBREGION',
                         baseday="2010-12-31",
+                        cores=cores,
                         bw=500,
                         bws=200,
                         tol=0.005,
@@ -326,69 +341,6 @@ virtual homogeneous dwelling, which is taken as representative of the area
 We select data in the Bilbao area, from 2012 onwards (observations before 
 are scarce)
 
-```{r}
-knitr::knit_exit()
-SlicedIndex <-
-  function(cal.pts,
-           spdatos = NULL,
-           from = NULL,
-           to = NULL,
-           base = NULL,
-           frm = NULL,
-           vars = NULL,
-           bw = 1000,
-           area.radius = 5 * bw,
-           date = NULL,
-           slice.by = NULL)
-  {
-    require(zoo)
-    if (is.null(date))
-      stop("'date' not specified with no default.")
-    if (is.null(slice.by))
-      stop("'slice.by' not specified with no default.")
-    #
-    # Convert observations to selected time interval
-    #
-    spdatos@data[, date] <- sapply(spdatos@data[, date], FUN = slice.by)
-    spdatos <- spdatos[(spdatos@data[, date] >= from) &
-                         (spdatos@data[, date] <= to), ]
-    #
-    # Pick only required variables, and cases complete for such variables
-    #
-    spdatos <- spdatos[complete.cases(spdatos@data), ]
-    slices  <- sort(unique(spdatos@data[, date]))
-    #
-    # For each calibration point, take a subset of observations within
-    # area.radius distance (projected coordinates are assumed)
-    #
-    xy      <- coordinates(cal.pts)
-    preds   <- as.data.frame(matrix(0, length(slices), nrow(cal.pts)))
-    colnames(preds) <- rownames(cal.pts)
-    preds   <- zoo(preds, order.by = slices)
-    
-    for (i in nrow(cal.pts)) {
-      sel <- rep(FALSE, nrow(spdatos@data))
-      sel <- sel | (colSums((t(coordinates(spdatos)) - xy[i, ]) ^ 2) <
-                      area.radius ^ 2)
-      for (j in seq_along(slices)) {
-        subsel <- sel & (spdatos@data[, date] == slices[j])
-        cat("Processing slice:  ", as.character(slices[j]), "\n")
-        cat(sum(subsel), "\n")
-        preds[j, ] <- gwr(
-          formula = frm,
-          bandwidth = bw,
-          data = spdatos[subsel, ],
-          fit.points = cal.pts,
-          predict = TRUE
-        )$SDF@data$"(Intercept)"
-      }
-    }
-    return(preds)
-  }
-```
-
-
-
 The points for which we want predictions must be in the form of a data frame
 with complete values of the variables used in the model. The easiest way to
 construct values for the argument `fit.points` below is to take arbitrary rows
@@ -428,3 +380,10 @@ preds <- SlicedIndex(
     slice.by=as.yearqtr)
 plot(exp(preds))
 ```
+
+```{r}
+final <- Sys.time()
+final - comienzo
+```
+
+
