@@ -16,7 +16,8 @@ BackFitting(
   bw = 5000,
   cores,
   tol = 0.001,
-  plotind = FALSE
+  plotind = FALSE,
+  gwrmod = FALSE
 )
 }
 \arguments{
@@ -43,6 +44,8 @@ BackFitting(
 \item{tol}{Máxima discrepancia relativa entre los valores de dos splines en iteraciones sucesivas para continuar la iteración.}
 
 \item{plotind}{Variable lógica: TRUE si se desea la impresión del índice resultante.}
+
+\item{gwrmod}{Variable lógica, TRUE si queremos los resultados del ajuste espacial}
 }
 \value{
 Un índice de precios, con base en el día especificado, en formato de serie temporal \code{zoo.}

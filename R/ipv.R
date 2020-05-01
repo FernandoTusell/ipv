@@ -635,6 +635,20 @@ IndZonas <- function(datos,
   return(x)
 }
 
+lonlat2UTM = function(lonlat,lat=NULL) {
+  if (!is.null(lat)) {       # In case lon and lat given as different numbers
+    lonlat <- c(lonlat,lat)
+  }
+  utm = (floor((lonlat[1]+180) / 6) %% 60) +1
+  if(lonlat[2] > 0) {
+    utm + 32600
+  } else {
+    utm + 32700
+  }
+}
+
+
+
 #' mggplot
 #'
 #' Representar múltiples índices (típicamente devueltos por la función \code{IndZonas}) en sendos paneles o superpuestos en un único panel.
