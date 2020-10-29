@@ -1,4 +1,5 @@
-#' Semi-parametric estimation usign backfiffing.
+
+#' Semi-parametric estimation usign backfiffing (global version)
 #'
 #' This function fits a parametric model whose parametric part is
 #' a geographically weigthed regression (GWR) while the non-parametric
@@ -159,8 +160,7 @@ BackFitting <- function(frm.param,
     } else {
     return(newind)
       }
-  }
-
+}
 
 #' Estimación semiparamétrica mediante 'backfitting' local.
 #'
@@ -190,7 +190,7 @@ BackFitting <- function(frm.param,
 #' @examples
 #'
 BackFittingLocal <- function(frm.param,
-                             smooth.term='s(x,bs="cr",k=24)',
+                             smooth.term='s(x,bs="cr",k=8)',
                              cal.pts=NULL,
                              datos,
                              indice0,
@@ -206,16 +206,20 @@ BackFittingLocal <- function(frm.param,
   require(mgcv)
   require(spgwr)
   require(parallel)
-  if (is.null(cal.pts) & is.null(bws))
+  if (is.null(cal.pts) & is.null(bws)) {
     global.fit <- TRUE
-  else if (xor(is.null(cal.pts), is.null(bws)))
-    stop("Both cal.pts and is.null must be NULL or non-NULL.")
-  else
+  } else {
+    if (xor(is.null(cal.pts), is.null(bws))) {
+      stop("Both cal.pts and is.null must be NULL or non-NULL.")
+    } else {
     global.fit <- FALSE
-  if (missing(cores))
+    }
+  }
+  if (missing(cores)) {
     cl <- makeCluster(detectCores())
-  else
+  } else {
     cl <- makeCluster(cores)
+  }
   resp  <- as.character(frm.param[[2]])
   datos <- as.data.frame(datos)   #  Tibbles dan problemas
   datos <- cbind(datos,y.orig=datos[,resp])
@@ -241,7 +245,7 @@ BackFittingLocal <- function(frm.param,
     frm.gwr <- frm.param
   }
 
-frm.suav <- formula(eval(parse(text=paste(resp," ~  ", smooth.term))))
+  frm.suav <- formula(eval(parse(text=paste(resp," ~  ", smooth.term))))
 
   #
   #  Creación de una SpatialDataFrame y selección de casos
@@ -263,7 +267,7 @@ frm.suav <- formula(eval(parse(text=paste(resp," ~  ", smooth.term))))
   )
   x <- spdatos@data$x
   if (!global.fit) {
-  npts    <- nrow(cal.pts)             # Número de puntos
+    npts    <- nrow(cal.pts)             # Número de puntos
   } else {
     npts <- 1
   }
@@ -272,77 +276,86 @@ frm.suav <- formula(eval(parse(text=paste(resp," ~  ", smooth.term))))
   #  La misma iteración que para un índice global único se lleva
   #  a cabo ahora para cada uno de los puntos en cal.pts
   #
+  spdatos.completo <- spdatos
   for (p in 1:npts) {
     if (!global.fit) {
       cat("Iniciado índice",p,"\n")
       punto   <- cal.pts[p,]                       # Punto de cálculo
-      d2 <- apply(sweep(coordinates(spdatos),2, punto)^2,1,sum)
-                                                   # Distancias al cuadrado al punto de cálculo
-    spdatos@data$w <- spgwr::gwr.Gauss(d2,bws)  # Pesos
-    }
-    mod.gam <- gam(formula=frm.global, data=spdatos@data, weights=w)
-    indice0 <- ConsInd(modelo = mod.gam,
-                       fechas = spdatos@data[,var.fecha, drop=TRUE],
-                       base = baseday,
-                       plot=FALSE)
-    #
-    #  Comienza ahora la alternancia entre estimaciones de la
-    #  parte paramétrica y no paramétrica del modelo, hasta
-    #  (esperamos) convergencia
-    #
-    newind <- indice0 ; lastind <- 0 * newind ; iter <-0
-    #
-    #  Mientras la máxima discrepancia entre dos índices
-    #  sucesivos sea pequeña, continúa
-    #
-    while( max(abs(newind-lastind)) > tol * max(abs(newind)) ) {
-      iter <- iter + 1
-      lastind <- newind
-      #
-      #  Deflactamos los datos con el índice provisional
-      #
-      deflactor <- log(lastind / 100)
-      tmp       <- match(spdatos@data[,var.fecha,drop=TRUE],
-                         index(deflactor))
-      spdatos@data[,resp] <-
-        spdatos@data[,"y.orig"] - coredata(deflactor[tmp])
-      #
-      #  Ajustamos un modelo espacial a los datos deflactados;
-      #  los valores ajustados, en mod.gwr$SDF@data$pred
-      #
-      mod.gwr      <- gwr(frm.gwr, data=spdatos, bandwidth=bw,
-                          hatmatrix=FALSE,
-                          gweight=gwr.Gauss,
-                          predictions=TRUE,
-                          cl=cl)
-      #
-      #  Los residuos del modelo espacial, a datos[,resp]
-      #
-      spdatos@data[,resp] <- spdatos@data[,"y.orig"] - mod.gwr$SDF@data$pred
-      #
-      #  Ajustamos un spline a datos[,resp]
-      #
-      mod.gam <- gam(formula=frm.suav, data=spdatos@data, weights=w)
-      newind  <- ConsInd(modelo = mod.gam,
+      d2 <- apply(sweep(coordinates(spdatos.completo),
+                        2, punto)^2,1,sum)
+      # Distancias al cuadrado al punto de cálculo
+      spdatos.completo@data$w <- w <- spgwr::gwr.Gauss(d2,bws)  # Pesos
+      spdatos <- spdatos.completo[w > 0.01,]
+      cat("Num. obs. empleadas =",nrow(spdatos),"\n")
+      if (nrow(spdatos) < 50) {
+        cat("Insufficient data for point ",punto,"\n")
+        break
+      }
+      mod.gam <- gam(formula=frm.global, data=spdatos@data, weights=w)
+      indice0 <- ConsInd(modelo = mod.gam,
                          fechas = spdatos@data[,var.fecha, drop=TRUE],
                          base = baseday,
-                         plot=plotind,
-                         x.base=x.base)
-      cat("Backfitting iteración ",iter,"\n")
+                         plot=FALSE)
+      #
+      #  Comienza ahora la alternancia entre estimaciones de la
+      #  parte paramétrica y no paramétrica del modelo, hasta
+      #  (esperamos) convergencia
+      #
+      newind <- indice0 ; lastind <- 0 * newind ; iter <-0
+      #
+      #  Mientras la máxima discrepancia entre dos índices
+      #  sucesivos sea pequeña, continúa
+      #
+      while( max(abs(newind-lastind)) > tol * max(abs(newind)) ) {
+        iter <- iter + 1
+        lastind <- newind
+        #
+        #  Deflactamos los datos con el índice provisional
+        #
+        deflactor <- log(lastind / 100)
+        tmp       <- match(spdatos@data[,var.fecha,drop=TRUE],
+                           index(deflactor))
+        spdatos@data[,resp] <-
+          spdatos@data[,"y.orig"] - coredata(deflactor[tmp])
+        #
+        #  Ajustamos un modelo espacial a los datos deflactados;
+        #  los valores ajustados, en mod.gwr$SDF@data$pred
+        #
+        mod.gwr      <- gwr(frm.gwr, data=spdatos, bandwidth=bw,
+                            hatmatrix=FALSE,
+                            gweight=gwr.Gauss,
+                            predictions=TRUE,
+                            cl=cl)
+        #
+        #  Los residuos del modelo espacial, a datos[,resp]
+        #
+        spdatos@data[,resp] <- spdatos@data[,"y.orig"] - mod.gwr$SDF@data$pred
+        #
+        #  Ajustamos un spline a datos[,resp]
+        #
+        mod.gam <- gam(formula=frm.suav, data=spdatos@data, weights=w)
+        newind  <- ConsInd(modelo = mod.gam,
+                           fechas = spdatos@data[,var.fecha, drop=TRUE],
+                           base = baseday,
+                           plot=plotind,
+                           x.base=x.base)
+        cat("Backfitting iteración ",iter,"\n")
+      }
+      indices[[p]] <- newind
     }
-    indices[[p]] <- newind
   }
-  stopCluster(cl)
-  if (global.fit)
-    indices=indices[[1]]
-  else
-    indices <- list(cal.pts, indices)
-  return(indices)
+    stopCluster(cl)
+    if (global.fit)
+      indices=indices[[1]]
+    else
+      indices <- list(cal.pts, indices)
+    return(indices)
 }
 
-#' cloromap
+
+#' This function creates cloropleth maps
 #'
-#' Creates cloropleth maps coding in color a variable.
+#' Given a spatail dataframe, creates a cloropleth map from the valaues of one of the variables in the @data slot
 #'
 #' @param sp Spatial dataframe, in whose @data slot variable \code{var.sp} defines the aggregation zones.
 #' @param var.sp Variable whose values specify the spatail aggregation.
@@ -379,8 +392,8 @@ cloromap <- function(sp, var.sp,
                                         name=legend.title, ...)
   } else {
     mapa <- mapa + scale_fill_gradient2(low="Blue",high="Red",
-                         name=legend.title, ...)
-    }
+                                        name=legend.title, ...)
+  }
   proy <- proj4string(sp)
   if(length(grep("proj=utm", proy)) > 0) {
     zona <- gsub("^(.*)zone=(\\d*).*","\\2", proy, perl=TRUE)
@@ -394,14 +407,15 @@ cloromap <- function(sp, var.sp,
   print(mapa)
 }
 
+
 #' CompFechas
 #'
-#' Dado un índice, definido sobre un conjunto de abscisas temporales con "huecos", define un nuevo índice interpolando los periodos sin observaciones.
+#' Given an index, defined over a set of incomplete dates, interpolates a new index over the full set of dates.
 #'
-#' @param indice Un índice tal como lo devuelve \code{ConsInd.}
-#' @param fechas Vector de fechas cuyos extremos definirán el nuevo fechado del índice
+#' @param indice An index, such as retruned by \code{ConsInd.}
+#' @param fechas Vector of dates whose extremes define the new date range
 #'
-#' @return Un índice diario, sobre todos los días que van de \code{min(fechas)} a \code{max(fechas).}
+#' @return A dily index over the period from \code{min(fechas)} to \code{max(fechas).}
 #' @export
 #'
 #' @examples
@@ -418,7 +432,7 @@ CompFechas <- function(indice,fechas) {
 #' extrae dicho término, lo completa para los días en que no haya observación, y lo devuelve como una serie temporal, representándolo gráficamente
 #' si se desea. Se supone que la variable respuesta el log(Precio) o log(Precio/m2); el índice devuelto lo es para la variable Precio o Precio/m2, respectivamente, y datos fechados diariamente.
 #'
-#' @param modelo Modelo semiparamétrico estimado por \code{g am.}
+#' @param modelo Modelo semiparamétrico estimado por \code{gam.}
 #' @param base Fecha (día) tomada como base 100 del índice.
 #' @param conf Confianza del intervalo; si no se especifica, 95\%.
 #' @param fechas Vector de fechas de las observaciones; habitualmente se toma de una columna de la dataframe empleada por \code{gams} para estimar \code{modelo}
@@ -482,7 +496,6 @@ ConsInd <- function(modelo=NULL,base="2008-02-01",
 #'
 #' @param X  Second dataframe to merge
 #' @param Y  Second dataframe to merge
-#'
 #' @param varX Variable acting as key in X
 #' @param locX Column in \code{canon} against which to match values of column \code{varX} in \code{X}
 #' @param varY Variable acting as key in Y
@@ -490,7 +503,6 @@ ConsInd <- function(modelo=NULL,base="2008-02-01",
 #' @param canon Correspondence between varX, varY and canonical value of the key (defaults to column 'Canon').
 #' @param locCanon Column in \code{canon} holding the canonical names. Defaults to column named 'Canon' if one exists and the argument is not set on call.
 #' @param transX Transformation to be applied to varX (if any)
-#' @param X
 #' @param transY Transformation to be applied to varY (if any)
 #'
 #' @return Data frame or merge of two data frames, with location names replaced by canonical names.
@@ -723,6 +735,8 @@ pols <- function(base, sub.var=NULL, sub.set=NULL,
 
 #' SlicedIndex
 #'
+#' Index computed in slices
+#'
 #' @param cal.pts Points at which the index is to be computed. It has the form of a spatial object, containing in the @data slot all required variables in formula `frm`  with values typically set for a "median house", a type of dwelling characteristic around the calibration point. It also needs to contain a date variable to create the time slices.
 #' @param spdatos Spatial data frame containing data and the `date` variable
 #' @param from Starting point in time for index computation.
@@ -738,6 +752,7 @@ pols <- function(base, sub.var=NULL, sub.set=NULL,
 #' @export
 #'
 #' @examples
+#'
 SlicedIndex <-
   function(cal.pts,
            spdatos = NULL,
@@ -794,3 +809,4 @@ SlicedIndex <-
     }
     return(preds)
   }
+
