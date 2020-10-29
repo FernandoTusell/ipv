@@ -1,0 +1,5 @@
+library(knitr)
+library(markdown)
+library(rmarkdown)
+Sys.setenv(RSTUDIO_PANDOC="/usr/lib/rstudio/bin/pandoc")
+rmarkdown::render("ejemplo-uso.Rmd")
