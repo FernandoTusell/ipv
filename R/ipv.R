@@ -76,6 +76,12 @@ setMethod("plot",
                                    100*x@conf,"%"))
             return(p)
           })
+setMethod("show",
+          c(object="Indice"),
+          function(object) {
+            print(object)
+          }
+)
 
 #' Semi-parametric estimation usign backfiffing (global version)
 #'
@@ -490,18 +496,25 @@ cloromap <- function(sp, var.sp,
 #'
 #' Given an index, defined over a set of incomplete dates, interpolates a new index over the full set of dates.
 #'
-#' @param indice An index, such as retruned by \code{ConsInd.}
-#' @param fechas Vector of dates whose extremes define the new date range
+#' @param indice An index, such as returned by \code{ConsInd.}, of class \cod{Indice} or \code{IndiceCB}
+#' @param fechas Vector of dates whose extremes define the new date range. Can be omitted, in which case the extremes are taken from the index of \code{indice}
 #'
 #' @return A dily index over the period from \code{min(fechas)} to \code{max(fechas).}
 #' @export
 #'
 #' @examples
 #'
-CompFechas <- function(indice,fechas) {
-  scratch <- zoo(0,order.by=seq.Date(from=min(fechas),to=max(fechas)+1,by="day"))
-  indice  <- merge(indice,scratch)[,1]
-  return(na.approx(indice,rule=2))
+CompFechas <- function(indice,fechas=NULL) {
+  old.fechas <- index(indice@ICV)
+  if (is.null(fechas))
+    fechas <- old.fechas
+  scratch     <- zoo(0,order.by=seq.Date(from=min(fechas),to=max(fechas)+1,by="day"))
+  indice@ICV  <- na.approx(merge(indice@ICV,scratch)[,1], rule=2)
+  if (class(indice)=="IndiceCB") {
+     indice@lcb <- as.numeric(merge(zoo(indice@lcb,old.fechas),scratch)[,1])
+     indice@ucb <- as.numeric(merge(zoo(indice@ucb,old.fechas),scratch)[,1])
+   }
+  return(indice)
 }
 
 #' ConsInd
@@ -524,42 +537,33 @@ CompFechas <- function(indice,fechas) {
 #'
 #' @examples
 #'
-ConsInd <- function(modelo=NULL,base="2008-02-01",
-                    conf=0.95,
+ConsInd <- function(modelo=NULL,
+                    conf=NULL,
                     fechas=NULL, tit=tit,
                     ylabel="Índice",
                     plot=FALSE,
-                    x.base) {
+                    basedate="2008-01-01",
+                    basevalue=100) {
   plotdata <- plot(modelo, select=0)[[1]]
-  if (missing(x.base))
-    x.base <- min(fechas) - 1
-  x <- as.Date(plotdata$x + as.Date(x.base))
+  if (missing(basedate))
+    basedate <- min(fechas) - 1
+  x <- as.Date(plotdata$x + as.Date(basedate))
 
 
-  y   <- plotdata$fit
-  se  <- plotdata$se
-  ICV <- data.frame(y, y - qnorm(conf)*se,
-                    y + qnorm(conf)*se)
-  difs <- as.numeric(abs(x-as.Date(base)))
+  y    <- plotdata$fit
+  se   <- plotdata$se
+  difs <- as.numeric(abs(x-as.Date(basedate)))
   orig <- seq_along(x)[difs==min(difs)]   # la fecha más próxima a la base
-  ICV  <- zoo(100*exp(ICV - as.numeric(ICV[orig,1])),
+  ICV  <- zoo(100*exp(y - as.numeric(y[orig])),
               order.by=x)
-  colnames(ICV) <- c("Indice","lcb", "ucb")
-  if (plot) {
-    p <- ggplot(ICV, aes(x = index(ICV), y = Indice))  +
-      geom_line() +
-      xlab("Fecha") + ylab("Índice") +
-      geom_line(aes(x = index(ICV), y = lcb),
-                col="blue", linetype="dotted") +
-      geom_line(aes(x = index(ICV), y = ucb),
-                col="blue", linetype="dotted") +
-      #geom_vline(xintercept=as.Date(base),
-      #            color="red", size=0.5) +
-      ggtitle(tit,
-              sub=paste("Base: ",base," = 100. Int. conf. ",
-                        100*conf,"%"))
-    print(p)
+
+  ind <- new("Indice", ICV=y, basevalue=100, basedate=basedate)
+  if (!is.null(conf)) {
+    lcb <- y - qnorm(conf)*se
+    ucb <- y + qnorm(conf)*se
+    ind <- new("IndiceCB", ind, lcb=lcb, ucb=ucb, conf=conf)
   }
+  #
   #  Antes de devolver el índice, que sólo está calculado para fechas que aparecían en
   #  el vector "fechas", vamos a completarlo para TODAS las fechas posibles entre la
   #  primera y la última. Eso garantiza que nos permitirá deflactar cualquier magnitud
@@ -567,7 +571,10 @@ ConsInd <- function(modelo=NULL,base="2008-02-01",
   #  abscisas temporales. Empleamos la función previamente
   #  definida 'CompFechas'.
   #
-  return( invisible(CompFechas(indice=ICV[,1], fechas=x)) )
+  ind <- CompFechas(ind, fechas)
+  if (plot)
+    plot(ind)
+  return(ind)
 }
 
 #' Fusion
