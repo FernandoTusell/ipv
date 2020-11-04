@@ -1,3 +1,81 @@
+#
+#  Class definitons for objects of type Indice and derived
+#
+setOldClass("zoo")
+setClassUnion("characterOrNULL",c("character", "NULL"))
+setClass("Indice",
+         slots=list(ICV="zoo", basedate="ANY", basevalue="numeric"))
+setClass("IndiceCB",
+         slots=list(lcb="numeric", ucb="numeric", conf="numeric"),
+         contains="Indice")
+setClass("IndiceLocal",
+         slots=list(Indice="Indice",coords="numeric"),
+         contains="Indice")
+setMethod("initialize",
+          signature="Indice",
+          definition= function(.Object, ICV, basedate=index(ICV)[1], basevalue=100) {
+            .Object@ICV = ICV
+            .Object@basedate  = basedate
+            .Object@basevalue = basevalue
+            return(.Object)
+          }
+)
+setMethod("initialize",
+          signature="IndiceCB",
+          definition= function(.Object, Indice, lcb, ucb, conf) {
+            .Object@ICV = Indice@ICV
+            .Object@basedate = Indice@basedate
+            .Object@basevalue = Indice@basevalue
+            .Object@lcb = lcb
+            .Object@ucb = ucb
+            .Object@conf = conf
+            return(.Object)
+          }
+)
+setMethod("print",
+          c(x="Indice"),
+          function(x) {
+          print(x@ICV)
+            }
+          )
+setMethod("print",
+          c(x="IndiceCB"),
+          function(x) {
+            tmp <- zoo(cbind(coredata(x@ICV), x@lcb, x@ucb),
+                       order.by=index(x@ICV))
+            colnames(tmp) <- c("Index", paste(c("lcb ","ucb "),100*x@conf,"%",sep=""))
+            print(tmp)
+          }
+)
+
+setMethod("plot",
+          c(x="Indice"),
+          function(x,..., tit="characterOrNULL") {
+          p <- ggplot(x@ICV, aes(x = index(x@ICV), y = as.numeric(x@ICV)))  +
+            geom_line() +
+            xlab("Fecha") + ylab("Índice")
+          if(!is(x,"IndiceCB")) {
+            #
+            #  If it is and IndiceCB, its own method will take care of
+            #  the title and subtitle, otherwise:
+            #
+            p <- p + ggtitle(tit,sub=paste("Base: ",x@basedate," = ",x@basevalue))
+          }
+          return(p)
+          }
+          )
+setMethod("plot",
+          c(x="IndiceCB"),
+          function(x, ..., tit="characterOrNULL") {
+            p <- callNextMethod() +
+                 geom_line(aes(x = index(x@ICV), y = x@lcb),
+                                   col="blue", linetype="dotted") +
+                 geom_line(aes(x = index(x@ICV), y = x@ucb),
+                                   col="blue", linetype="dotted") +
+                 ggtitle(tit, sub=paste("Base: ",x@basedate," = ",x@basevalue,". Int. conf. ",
+                                   100*x@conf,"%"))
+            return(p)
+          })
 
 #' Semi-parametric estimation usign backfiffing (global version)
 #'
