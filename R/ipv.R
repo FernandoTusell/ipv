@@ -20,6 +20,19 @@ setMethod("initialize",
             return(.Object)
           }
 )
+setMethod("head",
+          signature=c(x="Indice"),
+          definition= function(x, ...)  {
+            head(x@ICV, ... )
+          }
+)
+setMethod("head",
+          signature=c(x="IndiceCB"),
+          definition= function(x, ...)  {
+            tmp <- zoo(coredata(x@ICV,x@lcb,x@ucb), order.by=index(x@ICV))
+            head(tmp, ... )
+          }
+)
 setMethod("initialize",
           signature="IndiceCB",
           definition= function(.Object, Indice, lcb, ucb, conf) {
@@ -182,8 +195,7 @@ BackFitting <- function(frm.param,
       mod.gam <- gam(formula=frm.global, data=spdatos@data)
       indice0 <- ConsInd(modelo = mod.gam,
                          fechas = spdatos@data[,var.fecha, drop=TRUE],
-                         base = baseday,
-                         plot=FALSE)
+                         basedate = baseday)@ICV
     }
     #
     #  Comienza ahora la alternancia entre estimaciones de la
@@ -225,9 +237,7 @@ BackFitting <- function(frm.param,
       mod.gam <- gam(frm.suav, data=spdatos@data)
       newind  <- ConsInd(modelo = mod.gam,
                          fechas = spdatos@data[,var.fecha, drop=TRUE],
-                         base = baseday,
-                         plot=plotind,
-                         x.base=x.base)
+                         basedate = baseday)@ICV
       cat("Backfitting iteración ",iter,"\n")
     }
     stopCluster(cl)
@@ -236,9 +246,7 @@ BackFitting <- function(frm.param,
     #
     ConsInd(modelo = mod.gam,
             fechas = spdatos@data[,var.fecha, drop=TRUE],
-            base = baseday,
-            plot=plotind,
-            x.base=x.base)
+            basedate = baseday)
     if (gwrmod) {
       return(list(ind=newind,gwrmod=mod.gwr ))
     } else {
@@ -285,8 +293,7 @@ BackFittingLocal <- function(frm.param,
                              bw=5000,
                              bws=NULL,
                              cores,
-                             tol=0.001,
-                             plotind=FALSE) {
+                             tol=0.001) {
   require(mgcv)
   require(spgwr)
   require(parallel)
@@ -378,8 +385,7 @@ BackFittingLocal <- function(frm.param,
       mod.gam <- gam(formula=frm.global, data=spdatos@data, weights=w)
       indice0 <- ConsInd(modelo = mod.gam,
                          fechas = spdatos@data[,var.fecha, drop=TRUE],
-                         base = baseday,
-                         plot=FALSE)
+                         basedate = baseday)
       #
       #  Comienza ahora la alternancia entre estimaciones de la
       #  parte paramétrica y no paramétrica del modelo, hasta
@@ -420,9 +426,7 @@ BackFittingLocal <- function(frm.param,
         mod.gam <- gam(formula=frm.suav, data=spdatos@data, weights=w)
         newind  <- ConsInd(modelo = mod.gam,
                            fechas = spdatos@data[,var.fecha, drop=TRUE],
-                           base = baseday,
-                           plot=plotind,
-                           x.base=x.base)
+                           basedate = baseday)
         cat("Backfitting iteración ",iter,"\n")
       }
       indices[[p]] <- newind
@@ -496,7 +500,7 @@ cloromap <- function(sp, var.sp,
 #'
 #' Given an index, defined over a set of incomplete dates, interpolates a new index over the full set of dates.
 #'
-#' @param indice An index, such as returned by \code{ConsInd.}, of class \cod{Indice} or \code{IndiceCB}
+#' @param indice An index, such as returned by \code{ConsInd.}, of class \code{Indice} or \code{IndiceCB}
 #' @param fechas Vector of dates whose extremes define the new date range. Can be omitted, in which case the extremes are taken from the index of \code{indice}
 #'
 #' @return A dily index over the period from \code{min(fechas)} to \code{max(fechas).}
@@ -511,8 +515,8 @@ CompFechas <- function(indice,fechas=NULL) {
   scratch     <- zoo(0,order.by=seq.Date(from=min(fechas),to=max(fechas)+1,by="day"))
   indice@ICV  <- na.approx(merge(indice@ICV,scratch)[,1], rule=2)
   if (class(indice)=="IndiceCB") {
-     indice@lcb <- as.numeric(merge(zoo(indice@lcb,old.fechas),scratch)[,1])
-     indice@ucb <- as.numeric(merge(zoo(indice@ucb,old.fechas),scratch)[,1])
+     indice@lcb <- as.numeric(na.approx(merge(zoo(indice@lcb,old.fechas),scratch)[,1], rule=2))
+     indice@ucb <- as.numeric(na.approx(merge(zoo(indice@ucb,old.fechas),scratch)[,1], rule=2))
    }
   return(indice)
 }
@@ -528,10 +532,7 @@ CompFechas <- function(indice,fechas=NULL) {
 #' @param conf Confianza del intervalo; si no se especifica, 95\%.
 #' @param fechas Vector de fechas de las observaciones; habitualmente se toma de una columna de la dataframe empleada por \code{gams} para estimar \code{modelo}
 #' @param tit Encabezamiento del gráfico producido con el índice.
-#' @param ylabel Rótulo eje de ordenadas
-#' @param plot Variable lógica: si es \code{FALSE} (default) no se genera el plot, en caso contrario sí.
-#' @param x.base Primera fecha en el plot; habitualmente en blanco y obtenida a partir de \code{fechas.}
-#'
+#' @param ylabel Rótulo eje de ordenadas.
 #' @return Un indice en formato \code{zoo}, que opcionalmente (plot=TRUE) es representado gráficamente.
 #' @export
 #'
@@ -539,28 +540,28 @@ CompFechas <- function(indice,fechas=NULL) {
 #'
 ConsInd <- function(modelo=NULL,
                     conf=NULL,
-                    fechas=NULL, tit=tit,
+                    fechas=NULL,
+                    tit=tit,
                     ylabel="Índice",
-                    plot=FALSE,
-                    basedate="2008-01-01",
+                    basedate,
                     basevalue=100) {
+  if (missing(fechas))
+    stop("Argument 'fechas' must be provided.")
   plotdata <- plot(modelo, select=0)[[1]]
-  if (missing(basedate))
-    basedate <- min(fechas) - 1
-  x <- as.Date(plotdata$x + as.Date(basedate))
-
-
-  y    <- plotdata$fit
+  startdate <- min(fechas)
+  x <- as.Date(plotdata$x + as.Date(startdate))
+  y    <- c(plotdata$fit)
   se   <- plotdata$se
   difs <- as.numeric(abs(x-as.Date(basedate)))
   orig <- seq_along(x)[difs==min(difs)]   # la fecha más próxima a la base
-  ICV  <- zoo(100*exp(y - as.numeric(y[orig])),
-              order.by=x)
-
-  ind <- new("Indice", ICV=y, basevalue=100, basedate=basedate)
+  ind <- new("Indice",
+             ICV=zoo(100*exp(y - as.numeric(y[orig])),
+                      order.by=x),
+             basevalue=100,
+             basedate=basedate)
   if (!is.null(conf)) {
-    lcb <- y - qnorm(conf)*se
-    ucb <- y + qnorm(conf)*se
+    lcb <- 100*exp(y - qnorm(conf)*se - as.numeric(y[orig]))
+    ucb <- 100*exp(y + qnorm(conf)*se - as.numeric(y[orig]))
     ind <- new("IndiceCB", ind, lcb=lcb, ucb=ucb, conf=conf)
   }
   #
@@ -571,9 +572,7 @@ ConsInd <- function(modelo=NULL,
   #  abscisas temporales. Empleamos la función previamente
   #  definida 'CompFechas'.
   #
-  ind <- CompFechas(ind, fechas)
-  if (plot)
-    plot(ind)
+  ind <- CompFechas(ind)
   return(ind)
 }
 
@@ -713,16 +712,18 @@ Fusion <- function(X,
 IndZonas <- function(datos,
                      zonas,
                      frm = NULL,
-                     base="2008-01-01",
+                     base=NULL,
                      plot=FALSE) {
+  if (is.null(base))
+    stop("Base date must be set in arbument 'base'.`")
   x <- vector("list",0)
   k <- match(zonas, colnames(datos))
   for (i in unique(datos[,k])) {
     sel <- datos[,k] == i
     mod <- gam( frm, data=datos[sel,])
     indice0 <- ConsInd(modelo = mod,
-                       fechas = datos$FEC_CREACION,
-                       base = base,
+                       fechas = datos[sel,]$FEC_CREACION,
+                       basedate = base,
                        conf= 0.95,
                        tit = paste("Índice precio vivienda. Ámbito: ",
                                    i, sep="")
@@ -762,9 +763,12 @@ lonlat2UTM = function(lonlat,lat=NULL) {
 #'
 mggplot <- function(x, columnas=names(x),
                     tipo=c("panel","multiple"),
+                    titulo=NULL,
                     leyenda=c("bottom","right")) {
-  if ( is.list(x))
-    x <- do.call("merge", x[columnas])
+  if ( !is.list(x))
+    stop("Argument 'x' must be a list of indices.")
+  basedate <- x[[1]]@basedate
+  x <- do.call("merge", lapply(x[columnas], FUN=function(x) x@ICV))
   fecha <- index(x)
   tmp   <- cbind(fecha, as.data.frame(x))
   tmp   <- tmp %>% gather(Ambito,indice,-fecha)
@@ -779,7 +783,11 @@ mggplot <- function(x, columnas=names(x),
     geom_line(aes(x=fecha, y=indice, colour=Ambito)) +
     xlab("Fecha") + ylab("Índice") +
     theme(legend.position=leyenda[1])
-  print(p)
+  if (!is.null(titulo))
+  p <- p + labs(title=titulo,
+                subtitle=paste("Base: ",basedate," = 100.", sep="")
+  )
+  return(p)
 }
 
 #' pols

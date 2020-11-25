@@ -14,13 +14,14 @@ knitr::opts_chunk$set(cache=TRUE, fig.width=7, fig.height=5.5)
 options(width=120)
 ```
 
+This is hardware-dependent and assumes MKL libraries for BLAS/LAPACK installed. Omit in case necessary and make `cores` equal to the number of cores in your machine you want to use.
+
 ```{r u107432}
 Sys.setenv(MKL_NUM_THREADS="8")
 Sys.setenv(MKL_DYNAMIC="TRUE")
 Sys.setenv(OMP_NUM_THREADS=4)
 cores=4
 ```
-
 
 
 In the process of constructing a housing price index for the Basque Autonomous Community (CAPV) and certain of its subareas using real estate data from web sources (mainly idealista.com), it has been necessary to write a number of functions, which are now collected in package `ipv`.
@@ -53,6 +54,7 @@ the use of functions.)
 Other than package `ipv` we will need those following: all of them can be obtained from CRAN.
 
 ```{r}
+library(ggplot2)
 library(mgcv)
 library(tidyverse, verbose=FALSE)
 library(sp)
@@ -92,7 +94,7 @@ We prepare the data computing the log price per unit of surface, an auxiliary ti
 date of the oldest observation in the sample) and filtering out observations for which no geographical information is available in coordinates `DX_ETRS89` and `DY_ETRS89`:
 
 ```{r PrepDatos}
-datos <- venta.dep %>% 
+datos <- alquiler.dep %>% 
   mutate( logpm2 = log(IMP_CREACION / NUM_SUPERF),
           x = as.integer(FEC_CREACION - min(FEC_CREACION)) ) %>%
   filter( !is.na(DX_ETRS89) & !is.na(DY_ETRS89)) %>%
@@ -107,16 +109,16 @@ Global models are estimated using function `gam`. For instance,
 
 
 ```{r ModeloGlobal}
-mod1 <- gam( logpm2 ~   SUBREGION + ROOMNUMBER + HASLIFT + 
-                HASGARDEN + HASSWMMINGPOOL + HASTERRACE + 
-                IND_GARAJE  + s(x,bs="cr", k=16), 
+mod1 <- gam( logpm2 ~   SUBREGION + ROOMNUMBER +
+                HASLIFT + HASGARDEN + HASSWMMINGPOOL + HASTERRACE + IND_GARAJE
+                NUM_SUPERF + s(x,bs="cr", k=10), 
               data=datos)
 ```
 
 It is up to the analyst to decide which variables to include. Clearly, we want a model as descriptive as posible,
 incorporating each variable which conceivably is descriptive of the quality of the dwellings; however, too ambitious a model will force to discard many observations for which the included variables are not observed. The `k` parameter
 is the equivalent number of degrees of freedom (EDF): we have found one or two per year to be plenty.
-`s(x, bs="cr", k=16)` is a cubic **spline** with the prescribed degrees of freedom.
+`s(x, bs="cr", k=10)` is a cubic **spline** with the prescribed degrees of freedom.
 
 Results can be inspected by:
 
@@ -131,10 +133,9 @@ anova(mod1)
 The object returned by `gam` is all we need to compute the index, using function  `ConsInd`:
 
 ```{r, ZonasViaSUBREGION}
-ind <- ConsInd(modelo=mod1, base="2007-12-31", 
+ind <- ConsInd(modelo=mod1, basedate="2007-12-31", 
         tit="Índice precio vivienda CAPV.\nEf. espacial: SUBREGION",
-        fechas=as.Date(datos$FEC_CREACION),
-        plot=TRUE)
+        fechas=as.Date(datos$FEC_CREACION), conf=0.95)
 ```
 
 Even though the desired result will most often be the graph,  `ConsInd` returns also (invisibly)
@@ -153,14 +154,14 @@ simplifica el trabajo: en lugar de una invocación a `ConsInd` para cada
 sóla invocación a `IndZonas` dando una variable `zonas` cuyos niveles 
 especificaran cada uno de los ámbitos para los que se calcula un índice.
 
-We might want to compute indeices for diferent zones. Function `IndZonas` is meant to simplify 
+We might want to compute indices for diferent zones. Function `IndZonas` is meant to simplify 
 the task: rather than a separate invocation to `ConsInd` for each zone, we can make a single
 invocation to `IndZonas` passing an argument `zonas` whose levels define the different zones.
 
 Hence, if we want a separate index for each province,
 
 ```{r}
-ind.prov <- IndZonas(datos, zonas="PROVINCIA", frm=formula(mod1))
+ind.prov <- IndZonas(datos, base="2007-12-31", zonas="PROVINCIA", frm=formula(mod1))
 ```
 
 No es preciso que proporcionemos toda la información obtenida al estimar 
@@ -171,15 +172,16 @@ We have taken the model specification formn `mod1`; we could type it directly.
 The following invocation would be functionally equivalente to the previous
 one:
 
-```{r}
-ind.prov <- IndZonas(datos, zonas="PROVINCIA", 
-                     frm=formula( logpm2 ~ SUBREGION + ROOMNUMBER + 
-                                    HASLIFT + HASGARDEN + HASSWMMINGPOOL +
-                                    HASTERRACE +  IND_GARAJE  + 
-                                    s(x,bs="cr", k=16) ))
+```{r IndicesProvinciales}
+sel   <- (datos$FEC_CREACION > as.Date("2007-11-30"))   # Only after this date there is enough data
+datos <- datos[sel,]
+ind.prov <- IndZonas(datos, zonas="PROVINCIA", base="2007-12-31",
+                     frm=mod1$formula)
+ind.af   <- IndZonas(datos, zonas="AF", base="2007-12-31",
+                     frm=update(mod1$formula, . ~ . - SUBREGION))
 ```
 
-The result in  `ind.prov` is *a list* of indices which can be represente in separate panels.
+The results in  `ind.prov` are *lists* of indices which can be represented in separate panels.
 
 
 #### mggplot
@@ -190,15 +192,15 @@ the names in the list `ind.prov`, but we could supply different names in the arg
 
 
 ```{r}
-prov <- names(ind.prov)
-prov
-mggplot(ind.prov, columnas=prov)   
+mggplot(ind.prov, titulo="Indice precios alquiler")   
+mggplot(ind.af, titulo="Indice precios alquiler")
 ```
 
 We might opt for plotting all indices in a single scale:
 
 ```{r}
-mggplot(ind.prov, columnas=prov, tipo="multiple")   
+mggplot(ind.prov, tipo="multiple", titulo="Indice precios alquiler")   
+mggplot(ind.af,   tipo="multiple", titulo="Indice precios alquiler")
 ```
 
 
@@ -212,33 +214,19 @@ by cross-validation, which with objects the size of the ones we have here would 
 We will set a bandwidth of 5000m; this is the radius of the circles around each point which receive substantial weight
 in the local fitting procedure.
 
-Lets create an spatial data frame with the variables we will need:
-
-```{r, CreacionSpatialDataFrame}
-datos$HASLIFT <- as.factor(datos$HASLIFT)
-spdatos <- datos[,c("logpm2","SUBREGION","ROOMNUMBER","HASLIFT",
-                    "HASGARDEN","HASSWMMINGPOOL","HASTERRACE",
-                    "IND_GARAJE","DX_ETRS89","DY_ETRS89","FEC_CREACION")]
-spdatos <- spdatos[complete.cases(spdatos),]
-coordinates(spdatos) <- ~ DX_ETRS89 + DY_ETRS89
-```
-
-
 The *backfitting* algorithm alternates the spatial and time adjustments until convergence. **For ilustration only a subsample is selected here, to reduce computation time. Results with the whole sample chage considerably.** 
 
 ```{r, BackFitting-Global}
 frm         <- formula(mod1)
-frm.param   <- update(frm, ~ . - s(x,bs="cr",k=16))
-smooth.term <- 's(x,bs="cr",k=16)'
+frm.param   <- update(frm, ~ . - s(x,bs="cr",k=10))
+smooth.term <- 's(x,bs="cr",k=10)'
 
-sel <- ((1:nrow(datos)) %% 5) == 0                        # One observation out of each 5
-sel <- sel & datos$FEC_CREACION > as.Date("2006-12-31")   # Only after this date there is enough data
-
+# sel <- ((1:nrow(datos)) %% 5) == 0                        # One observation out of each 5
 indice <- BackFitting(frm.param=frm.param,
             smooth.term=smooth.term,
             var.loc="SUBREGION",
             coords=c("DX_ETRS89","DY_ETRS89"),
-            datos=datos[sel,],
+            datos=datos,
             cores=cores,
             var.fecha='FEC_CREACION',
             baseday='2008-01-01')
