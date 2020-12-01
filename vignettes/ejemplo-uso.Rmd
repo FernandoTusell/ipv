@@ -4,7 +4,7 @@ author: "F. Tusell"
 date: "`r Sys.Date()`"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteIndexEntry{Use of some functions in package 'ipv'}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -13,14 +13,14 @@ vignette: >
 knitr::opts_chunk$set(cache=TRUE, fig.width=7, fig.height=5.5)
 options(width=120)
 ```
-
+ 
 This is hardware-dependent and assumes MKL libraries for BLAS/LAPACK installed. Omit in case necessary and make `cores` equal to the number of cores in your machine you want to use.
 
 ```{r u107432}
-Sys.setenv(MKL_NUM_THREADS="8")
-Sys.setenv(MKL_DYNAMIC="TRUE")
-Sys.setenv(OMP_NUM_THREADS=4)
-cores=4
+# Sys.setenv(MKL_NUM_THREADS="8")
+# Sys.setenv(MKL_DYNAMIC="TRUE")
+# Sys.setenv(OMP_NUM_THREADS=4)
+cores=2
 ```
 
 
@@ -110,7 +110,7 @@ Global models are estimated using function `gam`. For instance,
 
 ```{r ModeloGlobal}
 mod1 <- gam( logpm2 ~   SUBREGION + ROOMNUMBER +
-                HASLIFT + HASGARDEN + HASSWMMINGPOOL + HASTERRACE + IND_GARAJE
+                HASLIFT + HASGARDEN + HASSWMMINGPOOL + HASTERRACE + IND_GARAJE +
                 NUM_SUPERF + s(x,bs="cr", k=10), 
               data=datos)
 ```
@@ -164,13 +164,7 @@ Hence, if we want a separate index for each province,
 ind.prov <- IndZonas(datos, base="2007-12-31", zonas="PROVINCIA", frm=formula(mod1))
 ```
 
-No es preciso que proporcionemos toda la información obtenida al estimar 
-el modelo `mod1`: basta con la fórmula, que podemos extraer de `mod1` o 
-directamente teclear. Una invocación equivalente a la anterior, sería:
-
 We have taken the model specification formn `mod1`; we could type it directly.
-The following invocation would be functionally equivalente to the previous
-one:
 
 ```{r IndicesProvinciales}
 sel   <- (datos$FEC_CREACION > as.Date("2007-11-30"))   # Only after this date there is enough data
@@ -214,28 +208,33 @@ by cross-validation, which with objects the size of the ones we have here would 
 We will set a bandwidth of 5000m; this is the radius of the circles around each point which receive substantial weight
 in the local fitting procedure.
 
-The *backfitting* algorithm alternates the spatial and time adjustments until convergence. **For ilustration only a subsample is selected here, to reduce computation time. Results with the whole sample chage considerably.** 
+The *backfitting* algorithm alternates the spatial and time adjustments until convergence. **For ilustration only a subsample is selected here, to reduce computation time. Results with the whole sample change considerably.** 
 
-```{r, BackFitting-Global}
+```{r BackFitting-Global}
 frm         <- formula(mod1)
 frm.param   <- update(frm, ~ . - s(x,bs="cr",k=10))
 smooth.term <- 's(x,bs="cr",k=10)'
 
-# sel <- ((1:nrow(datos)) %% 5) == 0                        # One observation out of each 5
-indice <- BackFitting(frm.param=frm.param,
+sel <- ((1:nrow(datos)) %% 5) == 0                        # One observation out of each 5
+if (!file.exists("bfg.rda")) {
+indice.bfg <- BackFitting(frm.param=frm.param,
             smooth.term=smooth.term,
             var.loc="SUBREGION",
             coords=c("DX_ETRS89","DY_ETRS89"),
-            datos=datos,
+            datos=datos[sel,],
             cores=cores,
             var.fecha='FEC_CREACION',
             baseday='2008-01-01')
+save(indice.bfg, file="bfg.rda")
+} else {
+  load("bfg.rda")
+}
 ```
 
 The result is
 
 ```{r}
-plot(indice)
+plot(indice.bfg)
 ```
 
 El resultado anterior corresponde a un modelo en que la parte paramétrica presenta 
@@ -245,14 +244,14 @@ la estimación de índices para ubicaciones concretas, cuyas coordenadas se pasa
 Seleccionaremos como puntos de cálculo de índices locales los centroides de barrios que parecen haber registrado una evolución diferente:
 
 ```{r, CreacionPuntosIndLocal}
-# barrios <- c("Indautxu", "Abando - Albia", "Deusto")
-# cal.pts <- matrix(0,length(barrios),2)
-# b    <- venta.dep[venta.dep$BARRIO %in% barrios, ]
-# dimnames(cal.pts) <- list(barrios, NULL)
-# for (i in barrios) {
-#   cal.pts[i,] <- apply(b[b$BARRIO==i, c("DX_ETRS89","DY_ETRS89")], 2, FUN="median", na.rm=TRUE)
-# }
-# cal.pts
+barrios <- c("Indautxu", "Abando - Albia", "Deusto")
+cal.pts <- matrix(0,length(barrios),2)
+b    <- venta.dep[venta.dep$BARRIO %in% barrios, ]
+dimnames(cal.pts) <- list(barrios, NULL)
+for (i in barrios) {
+  cal.pts[i,] <- apply(b[b$BARRIO==i, c("DX_ETRS89","DY_ETRS89")], 2, FUN="median", na.rm=TRUE)
+}
+cal.pts
 
 xy <- data.frame(ID=c("PlazaEnsanche","GeneralEguia"),
                  X=c(-2.931413,-2.946283),
@@ -267,31 +266,30 @@ rownames(cal.pts) <- res[,"ID"]
 
 Podemos ahora calcular varios índices locales así:
 
-```{r, BackFittingLocal}
+```{r BackFittingLocal}
 # 
 #  Eliminación de observaciones muy lejos de Bilbao
 #
 sel <- (datos$DX_ETRS89 > 504000) & (datos$DX_ETRS89 < 506000)
 sel <- sel & (datos$DY_ETRS89 > 4788000) & (datos$DX_ETRS89 < 4791000)
-sel <- sel & datos$FEC_CREACION > as.Date("2010-12-31")   # Sólo donde hay datos suficientes
-
-lista.ind <- BackFittingLocal(frm.param=frm.param,
-                        smooth.term='s(x,bs="cr",k=9)',
+sel <- sel & datos$FEC_CREACION > as.Date("2010-01-31")   # Sólo donde hay datos suficientes
+datos.sub <- datos[sel,]
+lista.ind <- BackFittingLocal(frm.param=formula(logpm2 ~ ROOMNUMBER + HASLIFT +
+                                                  IND_GARAJE + NUM_SUPERF),
+                        smooth.term='s(x,bs="cr",k=10)',
                         cal.pts=cal.pts,
-                        datos=datos[sel,],
+                        datos=datos.sub,
                         coords=c("DX_ETRS89","DY_ETRS89"),
                         var.fecha='FEC_CREACION',
-                        var.loc='SUBREGION',
                         baseday="2010-12-31",
                         cores=cores,
                         bw=500,
                         bws=200,
-                        tol=0.005,
-                        plotind=FALSE)
+                        tol=0.005)
 ```
 
 
-```{r}
+```{r. eval=FALSE}
 names(lista.ind[[2]]) <- rownames(lista.ind[[1]])
 p <-mggplot(lista.ind[[2]], columnas=rownames(lista.ind[[1]]), tipo="multiple")
 p <- p + ggtitle("Local indices",
@@ -304,7 +302,7 @@ print(p)
 
 ### Local indices via time slicing
 
-Am alternative way to the computation of local indices would be time slicing. Using this approach, 
+An alternative way to the computation of local indices would be time slicing. Using this approach, 
 for each location we would do the following:
 
 1. Set the calibration point (location for which the index is sought).
@@ -338,7 +336,7 @@ for the ones we want, and the set the coordinates conveniently. We use as a
 elevator, but no garden, swimming pool or terrace ---the first two attributes
 being non-existent in the area---.
 
-```{r}
+```{r, eval=FALSE}
 median.houses <- spdatos@data[1:2,]
 median.houses$ROOMNUMBER <- 3
 median.houses$HASLIFT <- factor("SI", levels=levels(spdatos@data$HASLIFT))
@@ -347,7 +345,7 @@ median.houses
 
 Now we set the coordinates:
 
-```{r}
+```{r, eval=FALSe
 coordinates(median.houses) <- cal.pts
 ```
 
@@ -355,7 +353,7 @@ We will fit a model to each slice of time, and obtain predictions of the prices 
 
 
 
-```{r}
+```{r, eval=FALSE}
 preds <- SlicedIndex(
     cal.pts = median.houses,
     spdatos = spdatos,
