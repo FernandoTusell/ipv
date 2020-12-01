@@ -2,7 +2,7 @@
 % Please edit documentation in R/ipv.R
 \name{BackFitting}
 \alias{BackFitting}
-\title{Semi-parametric estimation usign backfiffing.}
+\title{Semi-parametric estimation usign backfiffing (global version)}
 \usage{
 BackFitting(
   frm.param,

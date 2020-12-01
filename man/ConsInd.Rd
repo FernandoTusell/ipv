@@ -6,19 +6,17 @@
 \usage{
 ConsInd(
   modelo = NULL,
-  base = "2008-02-01",
-  conf = 0.95,
+  conf = NULL,
   fechas = NULL,
   tit = tit,
   ylabel = "Índice",
   plot = FALSE,
-  x.base
+  basedate = "2008-01-01",
+  basevalue = 100
 )
 }
 \arguments{
-\item{modelo}{Modelo semiparamétrico estimado por \code{g am.}}
-
-\item{base}{Fecha (día) tomada como base 100 del índice.}
+\item{modelo}{Modelo semiparamétrico estimado por \code{gam.}}
 
 \item{conf}{Confianza del intervalo; si no se especifica, 95\%.}
 
@@ -29,6 +27,8 @@ ConsInd(
 \item{ylabel}{Rótulo eje de ordenadas}
 
 \item{plot}{Variable lógica: si es \code{FALSE} (default) no se genera el plot, en caso contrario sí.}
+
+\item{base}{Fecha (día) tomada como base 100 del índice.}
 
 \item{x.base}{Primera fecha en el plot; habitualmente en blanco y obtenida a partir de \code{fechas.}}
 }

@@ -6,7 +6,7 @@
 \usage{
 BackFittingLocal(
   frm.param,
-  smooth.term = "s(x,bs=\\"cr\\",k=24)",
+  smooth.term = "s(x,bs=\\"cr\\",k=8)",
   cal.pts = NULL,
   datos,
   indice0,

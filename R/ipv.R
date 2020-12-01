@@ -193,7 +193,7 @@ BackFitting <- function(frm.param,
     #
     if (missing(indice0)) {
       mod.gam <- gam(formula=frm.global, data=spdatos@data)
-      indice0 <- ConsInd(modelo = mod.gam,
+      lastind <- newind <-  ConsInd(modelo = mod.gam,
                          fechas = spdatos@data[,var.fecha, drop=TRUE],
                          basedate = baseday)@ICV
     }
@@ -202,7 +202,8 @@ BackFitting <- function(frm.param,
     #  parte paramétrica y no paramétrica del modelo, hasta
     #  (esperamos) convergencia
     #
-    newind <- indice0 ; lastind <- 0 * newind ; iter <-0
+    lastind <- 0 * newind
+    iter <-0
     #
     #  Mientras la máxima discrepancia entre dos índices
     #  sucesivos sea pequeña, continúa
@@ -321,6 +322,14 @@ BackFittingLocal <- function(frm.param,
   #  significado espacial de la fórmula a emplear en la
   #  estimación GWR.
   #
+
+  if (!is.null(var.loc)) {
+    frm.param    <- update(frm.param,
+                         eval(parse(text=paste("~ . - ",
+                                               var.loc))))
+  } else {
+    frm.param <- frm.param
+  }
   frm.global <- update(frm.param,
                        eval(parse(text=paste("~ . + ",
                                              smooth.term))))
@@ -328,14 +337,6 @@ BackFittingLocal <- function(frm.param,
                        eval(parse(text=paste("~ . + y.orig + ",
                                              paste(c(coords,var.fecha),
                                                    collapse="+")))))
-  if (!is.null(var.loc)) {
-    frm.gwr    <- update(frm.param,
-                         eval(parse(text=paste("~ . - ",
-                                               var.loc))))
-  } else {
-    frm.gwr <- frm.param
-  }
-
   frm.suav <- formula(eval(parse(text=paste(resp," ~  ", smooth.term))))
 
   #
@@ -383,15 +384,16 @@ BackFittingLocal <- function(frm.param,
         break
       }
       mod.gam <- gam(formula=frm.global, data=spdatos@data, weights=w)
-      indice0 <- ConsInd(modelo = mod.gam,
+      lastind <- newind <- ConsInd(modelo = mod.gam,
                          fechas = spdatos@data[,var.fecha, drop=TRUE],
-                         basedate = baseday)
+                         basedate = baseday)@ICV
       #
       #  Comienza ahora la alternancia entre estimaciones de la
       #  parte paramétrica y no paramétrica del modelo, hasta
       #  (esperamos) convergencia
       #
-      newind <- indice0 ; lastind <- 0 * newind ; iter <-0
+      lastind <- 0 * newind
+      iter <-0
       #
       #  Mientras la máxima discrepancia entre dos índices
       #  sucesivos sea pequeña, continúa
@@ -411,7 +413,7 @@ BackFittingLocal <- function(frm.param,
         #  Ajustamos un modelo espacial a los datos deflactados;
         #  los valores ajustados, en mod.gwr$SDF@data$pred
         #
-        mod.gwr      <- gwr(frm.gwr, data=spdatos, bandwidth=bw,
+        mod.gwr      <- gwr(frm.param, data=spdatos, bandwidth=bw,
                             hatmatrix=FALSE,
                             gweight=gwr.Gauss,
                             predictions=TRUE,
@@ -424,12 +426,13 @@ BackFittingLocal <- function(frm.param,
         #  Ajustamos un spline a datos[,resp]
         #
         mod.gam <- gam(formula=frm.suav, data=spdatos@data, weights=w)
-        newind  <- ConsInd(modelo = mod.gam,
+        tmp     <- ConsInd(modelo = mod.gam,
                            fechas = spdatos@data[,var.fecha, drop=TRUE],
                            basedate = baseday)
+        newind  <- tmp@ICV
         cat("Backfitting iteración ",iter,"\n")
       }
-      indices[[p]] <- newind
+      indices[[p]] <- tmp
     }
   }
     stopCluster(cl)
@@ -509,9 +512,9 @@ cloromap <- function(sp, var.sp,
 #' @examples
 #'
 CompFechas <- function(indice,fechas=NULL) {
-  old.fechas <- index(indice@ICV)
+  default.fechas <- index(indice@ICV)
   if (is.null(fechas))
-    fechas <- old.fechas
+    fechas <- default.fechas
   scratch     <- zoo(0,order.by=seq.Date(from=min(fechas),to=max(fechas)+1,by="day"))
   indice@ICV  <- na.approx(merge(indice@ICV,scratch)[,1], rule=2)
   if (class(indice)=="IndiceCB") {
@@ -533,7 +536,7 @@ CompFechas <- function(indice,fechas=NULL) {
 #' @param fechas Vector de fechas de las observaciones; habitualmente se toma de una columna de la dataframe empleada por \code{gams} para estimar \code{modelo}
 #' @param tit Encabezamiento del gráfico producido con el índice.
 #' @param ylabel Rótulo eje de ordenadas.
-#' @return Un indice en formato \code{zoo}, que opcionalmente (plot=TRUE) es representado gráficamente.
+#' @return Un objeto de clase 'Ìndice' o 'IndiceCB'.
 #' @export
 #'
 #' @examples
@@ -565,14 +568,13 @@ ConsInd <- function(modelo=NULL,
     ind <- new("IndiceCB", ind, lcb=lcb, ucb=ucb, conf=conf)
   }
   #
-  #  Antes de devolver el índice, que sólo está calculado para fechas que aparecían en
-  #  el vector "fechas", vamos a completarlo para TODAS las fechas posibles entre la
+  #  Antes de devolver el índice, vamos a completarlo para TODAS las fechas posibles entre la
   #  primera y la última. Eso garantiza que nos permitirá deflactar cualquier magnitud
   #  definida en el mismo intervalo de fechas, pero no necesariamente sobre las mismas
   #  abscisas temporales. Empleamos la función previamente
   #  definida 'CompFechas'.
   #
-  ind <- CompFechas(ind)
+  ind <- CompFechas(ind, fechas)
   return(ind)
 }
 

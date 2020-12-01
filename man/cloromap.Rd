@@ -2,7 +2,7 @@
 % Please edit documentation in R/ipv.R
 \name{cloromap}
 \alias{cloromap}
-\title{cloromap}
+\title{This function creates cloropleth maps}
 \usage{
 cloromap(
   sp,
@@ -45,7 +45,7 @@ cloromap(
 A map, of ggplot2 format, printed by default.
 }
 \description{
-Creates cloropleth maps coding in color a variable.
+Given a spatail dataframe, creates a cloropleth map from the valaues of one of the variables in the @data slot
 }
 \examples{
 

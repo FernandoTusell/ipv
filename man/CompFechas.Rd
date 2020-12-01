@@ -4,18 +4,18 @@
 \alias{CompFechas}
 \title{CompFechas}
 \usage{
-CompFechas(indice, fechas)
+CompFechas(indice, fechas = NULL)
 }
 \arguments{
-\item{indice}{Un índice tal como lo devuelve \code{ConsInd.}}
+\item{indice}{An index, such as returned by \code{ConsInd.}, of class \code{Indice} or \code{IndiceCB}}
 
-\item{fechas}{Vector de fechas cuyos extremos definirán el nuevo fechado del índice}
+\item{fechas}{Vector of dates whose extremes define the new date range. Can be omitted, in which case the extremes are taken from the index of \code{indice}}
 }
 \value{
-Un índice diario, sobre todos los días que van de \code{min(fechas)} a \code{max(fechas).}
+A dily index over the period from \code{min(fechas)} to \code{max(fechas).}
 }
 \description{
-Dado un índice, definido sobre un conjunto de abscisas temporales con "huecos", define un nuevo índice interpolando los periodos sin observaciones.
+Given an index, defined over a set of incomplete dates, interpolates a new index over the full set of dates.
 }
 \examples{
 
