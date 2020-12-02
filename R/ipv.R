@@ -515,11 +515,12 @@ CompFechas <- function(indice,fechas=NULL) {
   default.fechas <- index(indice@ICV)
   if (is.null(fechas))
     fechas <- default.fechas
+  fechas <- unique(fechas)
   scratch     <- zoo(0,order.by=seq.Date(from=min(fechas),to=max(fechas)+1,by="day"))
   indice@ICV  <- na.approx(merge(indice@ICV,scratch)[,1], rule=2)
   if (class(indice)=="IndiceCB") {
-     indice@lcb <- as.numeric(na.approx(merge(zoo(indice@lcb,old.fechas),scratch)[,1], rule=2))
-     indice@ucb <- as.numeric(na.approx(merge(zoo(indice@ucb,old.fechas),scratch)[,1], rule=2))
+     indice@lcb <- as.numeric(na.approx(merge(zoo(indice@lcb,fechas),scratch)[,1], rule=2))
+     indice@ucb <- as.numeric(na.approx(merge(zoo(indice@ucb,fechas),scratch)[,1], rule=2))
    }
   return(indice)
 }
@@ -841,21 +842,21 @@ pols <- function(base, sub.var=NULL, sub.set=NULL,
 #' @param bw  Bandwidth to be used in GWR.
 #' @param area.radius Area to subselect data. Usefull when we want a local index and wnat to discard observations which are hardly relevant. By default, five times the selected GWR bandwidth.
 #' @param date  Variable in the @data slot of `spdatos` which gives the date of each observation.
-#' @param slice.by  Function to be applied to `date` in otrder to obtain the time slices. It must produce a time value of the same type as `to` and  `from`.
+#' @param slice.by  Function to be applied to `date` in order to obtain the time slices. It must produce a time value of the same type as `to` and  `from`.
 #'
 #' @return
 #' @export
 #'
 #' @examples
 #'
-SlicedIndex <-
-  function(cal.pts,
-           spdatos = NULL,
+SlicedIndex <- function(cal.pts,
+           datos = NULL,
            from = NULL,
            to = NULL,
            base = NULL,
            frm = NULL,
            bw = 1000,
+           coords = NULL,
            area.radius = 5 * bw,
            date = NULL,
            slice.by = NULL)
@@ -865,16 +866,18 @@ SlicedIndex <-
       stop("'date' not specified with no default.")
     if (is.null(slice.by))
       stop("'slice.by' not specified with no default.")
+    spdatos <- datos
+    datos   <- get_all_vars(frm, datos)
+    spdatos <- spdatos[complete.cases(datos), ]
+    coordinates(spdatos) <- eval(parse(text=paste("~ ",
+                                                  paste(coords,
+                                                        collapse="+"))))
     #
     # Convert observations to selected time interval
     #
     spdatos@data[, date] <- sapply(spdatos@data[, date], FUN = slice.by)
     spdatos <- spdatos[(spdatos@data[, date] >= from) &
                          (spdatos@data[, date] <= to), ]
-    #
-    # Pick only required variables, and cases complete for such variables
-    #
-    spdatos <- spdatos[complete.cases(spdatos@data), ]
     slices  <- sort(unique(spdatos@data[, date]))
     #
     # For each calibration point, take a subset of observations within
@@ -884,7 +887,6 @@ SlicedIndex <-
     preds   <- as.data.frame(matrix(0, length(slices), nrow(cal.pts)))
     colnames(preds) <- rownames(cal.pts)
     preds   <- zoo(preds, order.by = slices)
-
     for (i in nrow(cal.pts)) {
       sel <- rep(FALSE, nrow(spdatos@data))
       sel <- sel | (colSums((t(coordinates(spdatos)) - xy[i, ]) ^ 2) <
@@ -893,13 +895,17 @@ SlicedIndex <-
         subsel <- sel & (spdatos@data[, date] == slices[j])
         cat("Processing slice:  ", as.character(slices[j]), "\n")
         cat(sum(subsel), "\n")
-        preds[j, ] <- gwr(
-          formula = frm,
-          bandwidth = bw,
-          data = spdatos[subsel, ],
-          fit.points = cal.pts,
-          predict = TRUE
-        )$SDF@data$"(Intercept)"
+        spdatos.sub <- spdatos[subsel,]
+        xx <- gwr(formula=frm,
+                  data = spdatos.sub,
+                  bandwidth = bw,
+                  hatmatrix = TRUE)
+        preds[j, ] <- gwr(formula = frm,
+                          data = spdatos.sub,
+                          bandwidth = bw,
+                          fit.points = cal.pts,
+                          predict = TRUE,
+                          fittedGWRobject=xx)$SDF@data$"(Intercept)"
       }
     }
     return(preds)

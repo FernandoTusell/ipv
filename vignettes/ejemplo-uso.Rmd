@@ -13,8 +13,8 @@ vignette: >
 knitr::opts_chunk$set(cache=TRUE, fig.width=7, fig.height=5.5)
 options(width=120)
 ```
- 
-This is hardware-dependent and assumes MKL libraries for BLAS/LAPACK installed. Omit in case necessary and make `cores` equal to the number of cores in your machine you want to use.
+
+Machine dependent. Make `cores` equal to the number of cores in your machine you want to use.
 
 ```{r u107432}
 # Sys.setenv(MKL_NUM_THREADS="8")
@@ -110,7 +110,7 @@ Global models are estimated using function `gam`. For instance,
 
 ```{r ModeloGlobal}
 mod1 <- gam( logpm2 ~   SUBREGION + ROOMNUMBER +
-                HASLIFT + HASGARDEN + HASSWMMINGPOOL + HASTERRACE + IND_GARAJE +
+                HASLIFT +  IND_GARAJE +
                 NUM_SUPERF + s(x,bs="cr", k=10), 
               data=datos)
 ```
@@ -273,12 +273,11 @@ Podemos ahora calcular varios índices locales así:
 sel <- (datos$DX_ETRS89 > 504000) & (datos$DX_ETRS89 < 506000)
 sel <- sel & (datos$DY_ETRS89 > 4788000) & (datos$DX_ETRS89 < 4791000)
 sel <- sel & datos$FEC_CREACION > as.Date("2010-01-31")   # Sólo donde hay datos suficientes
-datos.sub <- datos[sel,]
 lista.ind <- BackFittingLocal(frm.param=formula(logpm2 ~ ROOMNUMBER + HASLIFT +
                                                   IND_GARAJE + NUM_SUPERF),
                         smooth.term='s(x,bs="cr",k=10)',
                         cal.pts=cal.pts,
-                        datos=datos.sub,
+                        datos=datos[sel,],
                         coords=c("DX_ETRS89","DY_ETRS89"),
                         var.fecha='FEC_CREACION',
                         baseday="2010-12-31",
@@ -289,7 +288,7 @@ lista.ind <- BackFittingLocal(frm.param=formula(logpm2 ~ ROOMNUMBER + HASLIFT +
 ```
 
 
-```{r. eval=FALSE}
+```{r BackFittingLocalPlot}
 names(lista.ind[[2]]) <- rownames(lista.ind[[1]])
 p <-mggplot(lista.ind[[2]], columnas=rownames(lista.ind[[1]]), tipo="multiple")
 p <- p + ggtitle("Local indices",
@@ -333,34 +332,36 @@ construct values for the argument `fit.points` below is to take arbitrary rows
 of `spdatos` (one for calibration point), replace the values of the variables
 for the ones we want, and the set the coordinates conveniently. We use as a
 "median house" for this area a flat with three bedrooms, garage space and
-elevator, but no garden, swimming pool or terrace ---the first two attributes
-being non-existent in the area---.
+elevator---.
 
-```{r, eval=FALSE}
-median.houses <- spdatos@data[1:2,]
+```{r}
+median.houses <- datos[1000:1001,] 
 median.houses$ROOMNUMBER <- 3
-median.houses$HASLIFT <- factor("SI", levels=levels(spdatos@data$HASLIFT))
+median.houses$HASLIFT <- factor("SI", levels=levels(datos$HASLIFT))
+median.houses$NUM_SUPERF <- 85
 median.houses
 ```
 
 Now we set the coordinates:
 
-```{r, eval=FALSe
-coordinates(median.houses) <- cal.pts
+```{r}
+median.houses <- median.houses[,-match(c("LAT","LNG"),colnames(median.houses))]
+coordinates(median.houses) <- c("DX_ETRS89","DY_ETRS89")
 ```
 
 We will fit a model to each slice of time, and obtain predictions of the prices for the median houses:
 
 
 
-```{r, eval=FALSE}
+```{r SlicedIndex}
 preds <- SlicedIndex(
     cal.pts = median.houses,
-    spdatos = spdatos,
-    from = as.yearqtr("2016 Q1"),
+    datos = datos,
+    coords = c("DX_ETRS89","DY_ETRS89"),
+    from = as.yearqtr("2015 Q1"),
     to = as.yearqtr("2019 Q1"),
     bw = 1000,
-    frm = formula(logpm2 ~ ROOMNUMBER + 
+    frm = formula(logpm2 ~ ROOMNUMBER + NUM_SUPERF +
                     HASLIFT + IND_GARAJE),
     date = "FEC_CREACION",
     slice.by=as.yearqtr)
