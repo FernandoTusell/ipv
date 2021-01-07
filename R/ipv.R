@@ -69,7 +69,7 @@ setMethod("plot",
             xlab("Fecha") + ylab("Índice")
           if(!is(x,"IndiceCB")) {
             #
-            #  If it is and IndiceCB, its own method will take care of
+            #  If it is an IndiceCB, its own method will take care of
             #  the title and subtitle, otherwise:
             #
             p <- p + ggtitle(tit,sub=paste("Base: ",x@basedate," = ",x@basevalue))

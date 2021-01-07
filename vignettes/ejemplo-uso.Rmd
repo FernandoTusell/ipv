@@ -208,14 +208,14 @@ by cross-validation, which with objects the size of the ones we have here would 
 We will set a bandwidth of 5000m; this is the radius of the circles around each point which receive substantial weight
 in the local fitting procedure.
 
-The *backfitting* algorithm alternates the spatial and time adjustments until convergence. **For ilustration only a subsample is selected here, to reduce computation time. Results with the whole sample change considerably.** 
+The *backfitting* algorithm alternates the spatial and time adjustments until convergence. **For ilustration only a subsample can be selected here, uncommenting the line which sets `sel`.to reduce computation time. Results with the full sample will be different.** 
 
 ```{r BackFitting-Global}
 frm         <- formula(mod1)
 frm.param   <- update(frm, ~ . - s(x,bs="cr",k=10))
 smooth.term <- 's(x,bs="cr",k=10)'
 
-sel <- ((1:nrow(datos)) %% 5) == 0                        # One observation out of each 5
+# sel <- ((1:nrow(datos)) %% 5) == 0                        # One observation out of each 5
 if (!file.exists("bfg.rda")) {
 indice.bfg <- BackFitting(frm.param=frm.param,
             smooth.term=smooth.term,
@@ -233,13 +233,12 @@ save(indice.bfg, file="bfg.rda")
 
 The result is
 
-```{r}
+```{r PlotBackfiffingGlobal, dependson="BackFitting-Global"}
 plot(indice.bfg)
 ```
 
-El resultado anterior corresponde a un modelo en que la parte paramétrica presenta 
-variación espacial (gracias al empleo de GWR), mientras que la parte no paramétrica (que da lugar al índice) es común al ámbito completo. La función `BackFittingLocal` permite 
-la estimación de índices para ubicaciones concretas, cuyas coordenadas se pasan en el argumento `cal.pts`. Hay que señalar un segundo *bandwitdh*, `bws`, que puede o no coincidir con el `bw` empleado en la GWR.
+The previous result corresponds to a model in which the parametric part displays spatial variation (accounted for by GWR) while the non-parametric part (which gives rise to the index) is unique for all the observations. Function `BackFittingLocal` affords the estimation of indices for specific points, whose coordinates are given in the
+argument `cal.pts`. A second bandwidth *bandwitdh*, `bws`, is specified, which may not be coincident with the `bw` used for the GWR: the former gives the spatial scope of observations which are deemed to share a time trend, while the second gives the scope of observations which are deemed to share a similar valuation of attributes.
 
 Seleccionaremos como puntos de cálculo de índices locales los centroides de barrios que parecen haber registrado una evolución diferente:
 
