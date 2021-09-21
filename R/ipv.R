@@ -26,11 +26,42 @@ setMethod("head",
             head(x@ICV, ... )
           }
 )
+setMethod("tail",
+          signature=c(x="Indice"),
+          definition= function(x, ...)  {
+            tail(x@ICV, ... )
+          }
+)
+
+
+
 setMethod("head",
           signature=c(x="IndiceCB"),
           definition= function(x, ...)  {
             tmp <- zoo(coredata(x@ICV,x@lcb,x@ucb), order.by=index(x@ICV))
             head(tmp, ... )
+          }
+)
+setMethod("tail",
+          signature=c(x="IndiceCB"),
+          definition= function(x, ...)  {
+            tmp <- zoo(coredata(x@ICV,x@lcb,x@ucb), order.by=index(x@ICV))
+            tail(tmp, ... )
+          }
+)
+
+
+setMethod("length",
+          signature=c(x="Indice"),
+          definition=function(x) {
+            return(length(x@ICV))
+          }
+)
+span <- function(x) {}
+setMethod("span",
+          signature=c(x="Indice"),
+          definition=function(x) {
+            c(min(index(x@ICV)),max(index(x@ICV)))
           }
 )
 setMethod("initialize",
@@ -96,6 +127,44 @@ setMethod("show",
           }
 )
 
+setMethod(
+  "[",
+  signature(x="Indice"),
+  function(x, i, j, ..., drop=TRUE) {
+      return( x@ICV[i] )
+  }
+)
+
+setMethod(
+  "[",
+  signature(x="IndiceCB"),
+  function(x, i, j, ..., drop=TRUE) {
+    return( c(x@ICV[i], x@lcb, x@ucb) )
+  }
+)
+
+
+setReplaceMethod(
+  "[",
+  signature(x="Indice", value="zoo"),
+  function(x, i, j,..., value) {
+    x@ICV[i] <- value
+    x
+  }
+)
+
+
+setReplaceMethod(
+  "[",
+  signature(x="Indice", value="Indice"),
+  function(x, i, j,..., value) {
+    x@ICV <- value@ICV
+    x
+  }
+)
+
+
+
 #' Semi-parametric estimation usign backfiffing (global version)
 #'
 #' This function fits a parametric model whose parametric part is
@@ -107,6 +176,7 @@ setMethod("show",
 #' @param var.loc Variable que en el modelo base se emplea como proxy de la ubicación. Se elimina en el modelo que realiza GWR
 #' @param datos Dataframe espacial conteniendo los datos.
 #' @param indice0 Valores iniciales del índice. Optativo: si está ausente, se calcula.
+#' @param congelado Índice para intervalo de fechas para las que ya no se desea recalcular
 #' @param coords Coordenadas espaciales de las observaciones. Pueden ser geográficas (latitud y longitud) en cuyo caso se calcula distancia geodésica, o coordenadas de una proyección plana, en cuyo caso de emplea distancia euclídea ordinaria.
 #' @param var.fecha Variable que recoge la fecha de cada observación. Debe formar parte de \code{datos.}
 #' @param baseday Día en que se fija la base 100 del índice.
@@ -126,13 +196,13 @@ BackFitting <- function(frm.param,
                        var.loc=NULL,
                        datos,
                        indice0,
+                       congelado,
                        coords,
                        var.fecha,
                        baseday="2012-12-31",
                        bw=5000,
                        cores,
                        tol=0.001,
-                       plotind=FALSE,
                        gwrmod=FALSE) {
     require(mgcv)
     require(spgwr)
@@ -193,9 +263,11 @@ BackFitting <- function(frm.param,
     #
     if (missing(indice0)) {
       mod.gam <- gam(formula=frm.global, data=spdatos@data)
-      lastind <- newind <-  ConsInd(modelo = mod.gam,
+      newind  <-  ConsInd(modelo = mod.gam,
                          fechas = spdatos@data[,var.fecha, drop=TRUE],
                          basedate = baseday)@ICV
+    } else {
+      newind <- indice0
     }
     #
     #  Comienza ahora la alternancia entre estimaciones de la
@@ -236,20 +308,19 @@ BackFitting <- function(frm.param,
       #  Ajustamos un spline a datos[,resp]
       #
       mod.gam <- gam(frm.suav, data=spdatos@data)
-      newind  <- ConsInd(modelo = mod.gam,
+      tmp     <- ConsInd(modelo = mod.gam,
+                         congelado=congelado,
                          fechas = spdatos@data[,var.fecha, drop=TRUE],
-                         basedate = baseday)@ICV
+                         basedate = baseday)
+      newind <- tmp@ICV
       cat("Backfitting iteración ",iter,"\n")
     }
     stopCluster(cl)
     #
-    #  Finalizado el ajuste, representamos el índice si plotind=TRUE
+    #  Devolvemos el resultado
     #
-    ConsInd(modelo = mod.gam,
-            fechas = spdatos@data[,var.fecha, drop=TRUE],
-            basedate = baseday)
     if (gwrmod) {
-      return(list(ind=newind,gwrmod=mod.gwr ))
+      return(list(ind=tmp,gwrmod=mod.gwr ))
     } else {
     return(newind)
       }
@@ -275,7 +346,6 @@ BackFitting <- function(frm.param,
 #' @param bws "Bandwidth" o radio del área espacial que recibe ponderación sustancial en la estimación del spline
 #' @param cores Número de cores que se desea emplear. Si no se indica nada, todos los de la máquina.
 #' @param tol Máxima discrepancia relativa entre los valores de dos splines en iteraciones sucesivas para continuar la iteración.
-#' @param plotind Variable lógica: TRUE si se desea la impresión del índice resultante.
 #'
 #' @return Una lista de índices de precios, con base en el día especificado, en formato de serie temporal \code{zoo;} uníndice para cada punto especificado en \code{cal.pts}.
 #' @export
@@ -287,6 +357,7 @@ BackFittingLocal <- function(frm.param,
                              cal.pts=NULL,
                              datos,
                              indice0,
+                             congelado,
                              coords,
                              var.fecha,
                              var.loc=NULL,
@@ -506,7 +577,7 @@ cloromap <- function(sp, var.sp,
 #' @param indice An index, such as returned by \code{ConsInd.}, of class \code{Indice} or \code{IndiceCB}
 #' @param fechas Vector of dates whose extremes define the new date range. Can be omitted, in which case the extremes are taken from the index of \code{indice}
 #'
-#' @return A dily index over the period from \code{min(fechas)} to \code{max(fechas).}
+#' @return A daily index over the period from \code{min(fechas)} to \code{max(fechas).}
 #' @export
 #'
 #' @examples
@@ -548,6 +619,7 @@ ConsInd <- function(modelo=NULL,
                     tit=tit,
                     ylabel="Índice",
                     basedate,
+                    congelado,
                     basevalue=100) {
   if (missing(fechas))
     stop("Argument 'fechas' must be provided.")
@@ -576,6 +648,19 @@ ConsInd <- function(modelo=NULL,
   #  definida 'CompFechas'.
   #
   ind <- CompFechas(ind, fechas)
+  #
+  #  Si hay valores del índice a no recalcular, se incorporan aquí y se realinean los
+  #  restantes. Ambos 'ind' y 'congelado' deben tener la misma base y ser de la misma
+  #  clase ("Indice" o "IndiceCB", y el conjunto de fechas sobre el que se extiende
+  #  'congelado' debe ser un subconjunto del conjunto de fechas sobre el qe se calcula
+  #  el nuevo índice 'ind').
+  #
+  if (!missing(congelado)) {
+    if (class(ind) != class(congelado))
+      stop("Error: clas(ind) != class(congelado)")
+    else
+      ind[index(congelado)] <- congelado
+  }
   return(ind)
 }
 
@@ -838,6 +923,7 @@ pols <- function(base, sub.var=NULL, sub.set=NULL,
 #' @param from Starting point in time for index computation.
 #' @param to End point in time for index computation.
 #' @param base Base ( = 100) period for index computation.
+#' @param logy TRUE (defaults) if left hand side of formula logged.
 #' @param frm Formula to be used in GWR. All variables must be present in the @data slot of `spdatos`.
 #' @param bw  Bandwidth to be used in GWR.
 #' @param area.radius Area to subselect data. Usefull when we want a local index and wnat to discard observations which are hardly relevant. By default, five times the selected GWR bandwidth.
@@ -859,7 +945,9 @@ SlicedIndex <- function(cal.pts,
            coords = NULL,
            area.radius = 5 * bw,
            date = NULL,
-           slice.by = NULL)
+           logy = TRUE,
+           slice.by = NULL,
+           verbose=TRUE)
   {
     require(zoo)
     if (is.null(date))
@@ -893,8 +981,10 @@ SlicedIndex <- function(cal.pts,
                       area.radius ^ 2)
       for (j in seq_along(slices)) {
         subsel <- sel & (spdatos@data[, date] == slices[j])
+        if (verbose) {
         cat("Processing slice:  ", as.character(slices[j]), "\n")
-        cat(sum(subsel), "\n")
+        cat("Observations: ",sum(subsel), "\n")
+        }
         spdatos.sub <- spdatos[subsel,]
         xx <- gwr(formula=frm,
                   data = spdatos.sub,
@@ -906,6 +996,22 @@ SlicedIndex <- function(cal.pts,
                           fit.points = cal.pts,
                           predict = TRUE,
                           fittedGWRobject=xx)$SDF@data$"(Intercept)"
+      }
+      #
+      #  Set base; first period takes as base by default
+      #
+      if (logy)
+        preds <- exp(preds)
+      if ( is.null(base) ) {
+        k <- 1
+      } else {
+        k <- match(base,slices)
+      }
+      #
+      #  Re-scale predictions, so base=100
+      #
+      for (j in 1:ncol(preds)) {
+        preds[, j] <- 100 * ( preds[, j] / as.numeric(preds[k, j]) )
       }
     }
     return(preds)
