@@ -4,13 +4,14 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo=TRUE, cache=FALSE, fig.width=7, fig.height=5.5)
+options(width=120)
 ```
 
 
 ## Purpose
 
-This vignette documents the constration of the "canonical matrices", containing the
+This vignette documents the construction of the "canonical matrices", containing the
 correspondence between geographical names from differente sources. Along with funcion
 `Fusion`, these matrices allow matching records referring to the same unit coming from
 different sources.

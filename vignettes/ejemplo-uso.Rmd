@@ -14,19 +14,16 @@ knitr::opts_chunk$set(cache=TRUE, fig.width=7, fig.height=5.5)
 options(width=120)
 ```
 
-Machine dependent. Make `cores` equal to the number of cores in your machine you want to use.
+Machine dependent. Make `cores` equal to the number of cores in your machine you want to use. Some routines (like `BackFitting`) can make use of more than one thread. Be careful: if R is linked to BLAS / LAPACK routines which are parallelized, and you parallelize also at the top level, this may destroy the performance of the machine. Set the value of `cores` so no more threads are started than the machine can accomodate.
 
 ```{r u107432}
-# Sys.setenv(MKL_NUM_THREADS="8")
-# Sys.setenv(MKL_DYNAMIC="TRUE")
-# Sys.setenv(OMP_NUM_THREADS=4)
 cores=2
 ```
 
 
 In the process of constructing a housing price index for the Basque Autonomous Community (CAPV) and certain of its subareas using real estate data from web sources (mainly idealista.com), it has been necessary to write a number of functions, which are now collected in package `ipv`.
 
-These are spur-of-the-moment functions, which are usable and in fact have supported our work; but they lack de degree of polish and checking that oen would expect from a carefuly planned and designed package.
+These are spur-of-the-moment functions, which are usable and in fact have supported our work; but they lack de degree of polish and checking that one would expect from a carefuly planned and designed package.
 
 
 ## Datos
@@ -138,7 +135,7 @@ ind <- ConsInd(modelo=mod1, basedate="2007-12-31",
         fechas=as.Date(datos$FEC_CREACION), conf=0.95)
 ```
 
-Even though the desired result will most often be the graph,  `ConsInd` returns also (invisibly)
+`ConsInd` returns  (invisibly)
 the index, as a time series with daily dates.
 
 ```{r}
@@ -146,13 +143,68 @@ class(ind)
 head(ind)
 ```
 
+The method used fits a spline to a number of points. Each time we add new observations 
+to the sample, normally "to the right", i.e. most recent data, a global fit is recomputed. This has the 
+potential of changing the values of the index for previous periods, which needs not be a bad thing: 
+it is quite common for past figures to be revised in the light of new data.
+
+If, however, we absolutely want to have previous values of the index computed so far unchanged, 
+we may pass a copy of such 'frozen' index as argument `congelado`, and the frozen values will be
+inserted in place of the newly computed values. See for instance,
+
+
+```{r}
+datos1 <- subset(datos, datos$FEC_CREACION < as.Date('2016-01-01') )
+mod1.1 <- gam( logpm2 ~   SUBREGION + ROOMNUMBER +
+                HASLIFT +  IND_GARAJE +
+                NUM_SUPERF + s(x,bs="cr", k=10), 
+              data=datos1)
+```
+
+
+
+```{r}
+mod1.2 <- gam( logpm2 ~   SUBREGION + ROOMNUMBER +
+                HASLIFT +  IND_GARAJE +
+                NUM_SUPERF + s(x,bs="cr", k=10), 
+              data=datos)
+```
+
+Here we estimate the index with data before '2016-01-01':
+```{r, Mod1.1}
+ind1.1 <- ConsInd(modelo=mod1.1, basedate="2007-12-31", 
+        tit="Índice precio vivienda CAPV.\nEf. espacial: SUBREGION",
+        fechas=as.Date(datos1$FEC_CREACION), conf=0.95)
+head(ind1.1)
+head(ind)
+```
+
+
+
+
+```{r, Mod1.2}
+ind1.2 <- ConsInd(modelo=mod1.1, basedate="2007-12-31", 
+        tit="Índice precio vivienda CAPV.\nEf. espacial: SUBREGION",
+        congelado=ind1.1,
+        fechas=as.Date(datos$FEC_CREACION), conf=0.95)
+head(ind1.2)
+tail(ind1.2)
+tail(ind)
+```
+
+
+
 #### IndZonas
 
-Podemos desear ajustar índices a diferentes ámbitos. La función `IndZonas`
-simplifica el trabajo: en lugar de una invocación a `ConsInd` para cada
-ámbito ---por ejemplo, para cada Territorio Histórico--- podemos hacer una 
-sóla invocación a `IndZonas` dando una variable `zonas` cuyos niveles 
-especificaran cada uno de los ámbitos para los que se calcula un índice.
+<!-- Podemos desear ajustar índices a diferentes ámbitos. La función `IndZonas` -->
+<!-- simplifica el trabajo: en lugar de una invocación a `ConsInd` para cada -->
+<!-- ámbito ---por ejemplo, para cada Territorio Histórico--- podemos hacer una  -->
+<!-- sóla invocación a `IndZonas` dando una variable `zonas` cuyos niveles  -->
+<!-- especificaran cada uno de los ámbitos para los que se calcula un índice. -->
+
+
+
+
 
 We might want to compute indices for diferent zones. Function `IndZonas` is meant to simplify 
 the task: rather than a separate invocation to `ConsInd` for each zone, we can make a single
