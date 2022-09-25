@@ -4,7 +4,7 @@
 setOldClass("zoo")
 setClassUnion("characterOrNULL",c("character", "NULL"))
 setClass("Indice",
-         slots=list(ICV="zoo", basedate="ANY", basevalue="numeric"))
+         slots=list(ICV="zoo", basedate="ANY", basevalue="numeric", tit="characterOrNULL"))
 setClass("IndiceCB",
          slots=list(lcb="numeric", ucb="numeric", conf="numeric"),
          contains="Indice")
@@ -13,10 +13,11 @@ setClass("IndiceLocal",
          contains="Indice")
 setMethod("initialize",
           signature="Indice",
-          definition= function(.Object, ICV, basedate=index(ICV)[1], basevalue=100) {
+          definition= function(.Object, ICV, basedate=index(ICV)[1], basevalue=100, tit=NULL) {
             .Object@ICV = ICV
             .Object@basedate  = basedate
             .Object@basevalue = basevalue
+            .Object@tit = tit
             return(.Object)
           }
 )
@@ -94,7 +95,7 @@ setMethod("print",
 
 setMethod("plot",
           c(x="Indice"),
-          function(x,..., tit="characterOrNULL") {
+          function(x,...) {
           p <- ggplot(x@ICV, aes(x = index(x@ICV), y = as.numeric(x@ICV)))  +
             geom_line() +
             xlab("Fecha") + ylab("Índice")
@@ -103,20 +104,20 @@ setMethod("plot",
             #  If it is an IndiceCB, its own method will take care of
             #  the title and subtitle, otherwise:
             #
-            p <- p + ggtitle(tit,sub=paste("Base: ",x@basedate," = ",x@basevalue))
+            p <- p + ggtitle(x@tit,sub=paste("Base: ",x@basedate," = ",x@basevalue))
           }
           return(p)
           }
           )
 setMethod("plot",
           c(x="IndiceCB"),
-          function(x, ..., tit="characterOrNULL") {
+          function(x, ...) {
             p <- callNextMethod() +
                  geom_line(aes(x = index(x@ICV), y = x@lcb),
                                    col="blue", linetype="dotted") +
                  geom_line(aes(x = index(x@ICV), y = x@ucb),
                                    col="blue", linetype="dotted") +
-                 ggtitle(tit, sub=paste("Base: ",x@basedate," = ",x@basevalue,". Int. conf. ",
+                 ggtitle(x@tit, sub=paste("Base: ",x@basedate," = ",x@basevalue,". Int. conf. ",
                                    100*x@conf,"%"))
             return(p)
           })
@@ -616,7 +617,7 @@ CompFechas <- function(indice,fechas=NULL) {
 ConsInd <- function(modelo=NULL,
                     conf=NULL,
                     fechas=NULL,
-                    tit=tit,
+                    tit=NULL,
                     ylabel="Índice",
                     basedate,
                     congelado,
@@ -634,7 +635,8 @@ ConsInd <- function(modelo=NULL,
              ICV=zoo(100*exp(y - as.numeric(y[orig])),
                       order.by=x),
              basevalue=100,
-             basedate=basedate)
+             basedate=basedate,
+             tit="aaa")
   if (!is.null(conf)) {
     lcb <- 100*exp(y - qnorm(conf)*se - as.numeric(y[orig]))
     ucb <- 100*exp(y + qnorm(conf)*se - as.numeric(y[orig]))
