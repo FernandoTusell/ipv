@@ -6,7 +6,7 @@ setClassUnion("characterOrNULL",c("character", "NULL"))
 setClass("Indice",
          slots=list(ICV="zoo", basedate="ANY", basevalue="numeric", tit="characterOrNULL"))
 setClass("IndiceCB",
-         slots=list(lcb="numeric", ucb="numeric", conf="numeric"),
+         slots=list(lcb="zoo", ucb="zoo", conf="numeric"),
          contains="Indice")
 setClass("IndiceLocal",
          slots=list(Indice="Indice",coords="numeric"),
@@ -21,6 +21,20 @@ setMethod("initialize",
             return(.Object)
           }
 )
+setMethod("initialize",
+          signature="IndiceCB",
+          definition= function(.Object, Indice, lcb, ucb, conf) {
+            .Object@ICV = Indiced@ICV
+            .Object@basedate  = Indice@basedate
+            .Object@basevalue = Indice@basevalue
+            .Object@tit = Indice@tit
+            .Object@lcb = lcb
+            .Object@ucb = ucb
+            .Object@conf = conf
+            return(.Object)
+          }
+)
+
 setMethod("head",
           signature=c(x="Indice"),
           definition= function(x, ...)  {
@@ -98,24 +112,20 @@ setMethod("plot",
           function(x,...) {
           p <- ggplot(x@ICV, aes(x = index(x@ICV), y = as.numeric(x@ICV)))  +
             geom_line() +
-            xlab("Fecha") + ylab("Índice")
-          if(!is(x,"IndiceCB")) {
-            #
-            #  If it is an IndiceCB, its own method will take care of
-            #  the title and subtitle, otherwise:
-            #
-            p <- p + ggtitle(x@tit,sub=paste("Base: ",x@basedate," = ",x@basevalue))
-          }
+            xlab("Fecha") + ylab("Índice") +
+            ggtitle(x@tit,sub=paste("Base: ",x@basedate," = ",x@basevalue))
           return(p)
           }
           )
 setMethod("plot",
           c(x="IndiceCB"),
           function(x, ...) {
-            p <- callNextMethod() +
-                 geom_line(aes(x = index(x@ICV), y = x@lcb),
+            p <- ggplot(x@ICV, aes(x = index(x@ICV), y = as.numeric(x@ICV)))  +
+                 geom_line() +
+                 xlab("Fecha") + ylab("Índice") +
+                 geom_line(aes(x = index(x@ICV), y = as.numeric(x@lcb)),
                                    col="blue", linetype="dotted") +
-                 geom_line(aes(x = index(x@ICV), y = x@ucb),
+                 geom_line(aes(x = index(x@ICV), y = as.numeric(x@ucb)),
                                    col="blue", linetype="dotted") +
                  ggtitle(x@tit, sub=paste("Base: ",x@basedate," = ",x@basevalue,". Int. conf. ",
                                    100*x@conf,"%"))
@@ -591,8 +601,8 @@ CompFechas <- function(indice,fechas=NULL) {
   scratch     <- zoo(0,order.by=seq.Date(from=min(fechas),to=max(fechas)+1,by="day"))
   indice@ICV  <- na.approx(merge(indice@ICV,scratch)[,1], rule=2)
   if (class(indice)=="IndiceCB") {
-     indice@lcb <- as.numeric(na.approx(merge(zoo(indice@lcb,fechas),scratch)[,1], rule=2))
-     indice@ucb <- as.numeric(na.approx(merge(zoo(indice@ucb,fechas),scratch)[,1], rule=2))
+     indice@lcb <- na.approx(merge(indice@lcb,scratch)[,1], rule=2)
+     indice@ucb <- na.approx(merge(indice@ucb,scratch)[,1], rule=2)
    }
   return(indice)
 }
@@ -636,11 +646,13 @@ ConsInd <- function(modelo=NULL,
                       order.by=x),
              basevalue=100,
              basedate=basedate,
-             tit="aaa")
+             tit=tit)
   if (!is.null(conf)) {
-    lcb <- 100*exp(y - qnorm(conf)*se - as.numeric(y[orig]))
-    ucb <- 100*exp(y + qnorm(conf)*se - as.numeric(y[orig]))
-    ind <- new("IndiceCB", ind, lcb=lcb, ucb=ucb, conf=conf)
+    ind <- new("IndiceCB", ind,
+               lcb= zoo(100*exp(y - qnorm(conf)*se - as.numeric(y[orig])), order.by=x),
+               ucb= zoo(100*exp(y + qnorm(conf)*se - as.numeric(y[orig])), order.by=x),
+               conf=conf)
+    ind@tit <- tit             #  This should not be needed
   }
   #
   #  Antes de devolver el índice, vamos a completarlo para TODAS las fechas posibles entre la
