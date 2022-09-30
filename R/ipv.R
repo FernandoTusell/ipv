@@ -100,7 +100,7 @@ setMethod("print",
 setMethod("print",
           c(x="IndiceCB"),
           function(x) {
-            tmp <- zoo(cbind(coredata(x@ICV), x@lcb, x@ucb),
+            tmp <- zoo(cbind(x@ICV, x@lcb, x@ucb),
                        order.by=index(x@ICV))
             colnames(tmp) <- c("Index", paste(c("lcb ","ucb "),100*x@conf,"%",sep=""))
             print(tmp)
@@ -678,6 +678,30 @@ ConsInd <- function(modelo=NULL,
   return(ind)
 }
 
+
+#' Title
+#'
+#' @param x Object containing column to deflate.
+#' @param pricevar Name of column to be deflated
+#' @param datevar  Name of column containing dates
+#' @param ind      Index (object of class \code{Indice} or \code{IndiceCB})
+#'
+#' @return Column \code{pricevar} deflated
+#' @export
+#'
+#' @examples
+Deflate <- function(x, pricevar, datevar, ind) {
+    d <- match(datevar, colnames(x))
+    p <- match(pricevar, colnames(x))
+    if(class(as.data.frame(x)[,d]) != class(index(ind@ICV))) {
+        cat("Dates in ",datevar," and index not the same.\n")
+        return()
+    }
+    tmp <- match(as.data.frame(x)[,d], index(ind@ICV))
+    return(as.data.frame(x)[,p] * coredata(ind@ICV)[tmp] / ind@basevalue)
+    }
+
+
 #' Fusion
 #'
 #' @param X  Second dataframe to merge
@@ -1030,4 +1054,3 @@ SlicedIndex <- function(cal.pts,
     }
     return(preds)
   }
-
