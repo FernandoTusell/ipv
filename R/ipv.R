@@ -679,18 +679,20 @@ ConsInd <- function(modelo=NULL,
 }
 
 
+
 #' Title
 #'
-#' @param x Object containing column to deflate.
-#' @param pricevar Name of column to be deflated
-#' @param datevar  Name of column containing dates
-#' @param ind      Index (object of class \code{Indice} or \code{IndiceCB})
+#' @param x
+#' @param pricevar
+#' @param datevar
+#' @param ind
+#' @param logscale
 #'
-#' @return Column \code{pricevar} deflated
+#' @return
 #' @export
 #'
 #' @examples
-Deflate <- function(x, pricevar, datevar, ind) {
+Deflate <- function(x, pricevar, datevar, ind, logscale=TRUE) {
     d <- match(datevar, colnames(x))
     p <- match(pricevar, colnames(x))
     if(class(as.data.frame(x)[,d]) != class(index(ind@ICV))) {
@@ -698,7 +700,10 @@ Deflate <- function(x, pricevar, datevar, ind) {
         return()
     }
     tmp <- match(as.data.frame(x)[,d], index(ind@ICV))
-    return(as.data.frame(x)[,p] * coredata(ind@ICV)[tmp] / ind@basevalue)
+    if (logscale==TRUE)
+      return(as.data.frame(x)[,p] + log(ind@basevalue / coredata(ind@ICV)[tmp]) )
+    else
+      return(as.data.frame(x)[,p] * (ind@basevalue / coredata(ind@ICV)[tmp] ))
     }
 
 
